@@ -1,0 +1,48 @@
+#===------------------------------------------------------------------------===#
+#
+#                     The KLEE Symbolic Virtual Machine
+#
+# This file is distributed under the University of Illinois Open Source
+# License. See LICENSE.TXT for details.
+#
+#===------------------------------------------------------------------------===#
+#
+# AUTOMATICALLY GENERATED. DO NOT EDIT!
+#
+#===------------------------------------------------------------------------===#
+LLVMCC := /usr/local/bin/clang -I/home/phli/klee/include
+LLVMAS := /usr/local/bin/llvm-as
+LLVMLINK := /usr/local/bin/llvm-link
+LLVMCC.CFlags := -O0 -Xclang -disable-O0-optnone -Wall
+
+# Make sure source files can match the pattern rules
+VPATH := /home/phli/klee/test/Concrete
+
+Output/.dir:
+	mkdir -p $@
+
+clean::
+	-rm -rf Output/
+
+Output/%.bc: %.c Output/.dir
+	$(LLVMCC) -emit-llvm -c $(LLVMCC.CFlags) $< -o $@
+
+Output/%.bc: %.ll $(LLVMAS) Output/.dir
+	$(LLVMAS) -f $< -o $@
+
+# We build a separate testingUtils bitcode for each test, to make sure parallel
+# tests don't interact with one another.
+Output/%_testingUtils.bc: _testingUtils.c Output/.dir
+	$(LLVMCC) -emit-llvm -c $(LLVMCC.CFlags) $< -o $@
+
+Output/linked_%.bc: Output/%.bc Output/%_testingUtils.bc
+	$(LLVMLINK) $< Output/$*_testingUtils.bc -o $@
+
+.PRECIOUS: Output/.dir
+
+## Cancel built-in implicit rules that override above rules
+%: %.s
+
+%: %.c
+
+%.o: %.c

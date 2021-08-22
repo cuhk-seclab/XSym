@@ -1,0 +1,5 @@
+/home/phli/klee/build/runtime/runtime_build_Debug+Asserts/klee-libc/abort.bc: \
+  /home/phli/klee/runtime/klee-libc/abort.c \
+  /home/phli/klee/include/klee/klee.h
+
+/home/phli/klee/include/klee/klee.h:

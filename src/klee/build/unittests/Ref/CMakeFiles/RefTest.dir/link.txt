@@ -1,0 +1,1 @@
+/usr/bin/c++   -fno-rtti -Wall -Wextra -Wno-unused-parameter -O0 -g   CMakeFiles/RefTest.dir/RefTest.cpp.o  -o ../RefTest -rdynamic ../../lib/libgtest_main.a ../../lib/libkleaverExpr.a ../../lib/libgtest.a -lz -ltcmalloc /usr/local/lib/libLLVMSupport.a /usr/local/lib/libLLVMDemangle.a -lz -lrt -ldl -ltinfo -lm -lxml2 -lz -lrt -ldl -ltinfo -lm -lxml2 -lpthread 

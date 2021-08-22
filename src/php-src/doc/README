@@ -1,0 +1,5 @@
+As of June 18, 1999, the documentation is now kept in the 'phpdoc'
+repository on the CVS server. This directory will be populated with the
+HTML version of the documentation for releases.
+
+Jim Winstead <jimw@php.net>

@@ -1,0 +1,11 @@
+/home/phli/klee/build/runtime/runtime_build_Debug+Asserts/POSIX/fd_32.bc: \
+  /home/phli/klee/runtime/POSIX/fd_32.c \
+  /home/phli/klee/include/klee/Config/Version.h \
+  /home/phli/klee/build/include/klee/Config/config.h \
+  /home/phli/klee/runtime/POSIX/fd.h
+
+/home/phli/klee/include/klee/Config/Version.h:
+
+/home/phli/klee/build/include/klee/Config/config.h:
+
+/home/phli/klee/runtime/POSIX/fd.h:

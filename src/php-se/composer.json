@@ -1,0 +1,6 @@
+{
+    "require": {
+        "nikic/php-parser": "4.3",
+        "myclabs/deep-copy": "1.9"
+    }
+}

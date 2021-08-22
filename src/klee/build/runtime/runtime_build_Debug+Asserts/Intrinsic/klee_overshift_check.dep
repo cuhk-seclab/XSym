@@ -1,0 +1,5 @@
+/home/phli/klee/build/runtime/runtime_build_Debug+Asserts/Intrinsic/klee_overshift_check.bc: \
+  /home/phli/klee/runtime/Intrinsic/klee_overshift_check.c \
+  /home/phli/klee/include/klee/klee.h
+
+/home/phli/klee/include/klee/klee.h:

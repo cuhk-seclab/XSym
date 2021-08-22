@@ -1,0 +1,10 @@
+#include "stdio.h"
+#include "phli.h"
+void php3_dl(pval*,int,pval*);
+int main(int argc, char* argv[]) {
+char *result_dir="/data/phli/results/php3_dl/";
+pval* arg_0=phli_construct_pval_string("arg_0");
+long* arg_1=phli_create_long("arg_1");
+pval* arg_2=phli_construct_pval_string("arg_2");
+php3_dl(arg_0,*arg_1,arg_2);
+}

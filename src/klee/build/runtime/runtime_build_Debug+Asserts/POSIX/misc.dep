@@ -1,0 +1,5 @@
+/home/phli/klee/build/runtime/runtime_build_Debug+Asserts/POSIX/misc.bc: \
+  /home/phli/klee/runtime/POSIX/misc.c \
+  /home/phli/klee/include/klee/klee.h
+
+/home/phli/klee/include/klee/klee.h:

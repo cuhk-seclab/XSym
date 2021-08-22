@@ -1,0 +1,301 @@
+Compiling the CXX compiler identification source file "CMakeCXXCompilerId.cpp" failed.
+Compiler: /usr/bin/c++ 
+Build flags: -D_GLIBCXX_USE_CXX11_ABI=0”;CXXFLAGS=”-fno-rtti
+Id flags: 
+
+The output was:
+1
+c++: error: CXXFLAGS=”-fno-rtti: No such file or directory
+
+
+Compiling the CXX compiler identification source file "CMakeCXXCompilerId.cpp" failed.
+Compiler: /usr/bin/c++ 
+Build flags: -D_GLIBCXX_USE_CXX11_ABI=0”;CXXFLAGS=”-fno-rtti
+Id flags: -c
+
+The output was:
+1
+c++: error: CXXFLAGS=”-fno-rtti: No such file or directory
+
+
+Checking whether the CXX compiler is IAR using "" did not match "IAR .+ Compiler":
+c++: error: CXXFLAGS=”-fno-rtti: No such file or directory
+c++: fatal error: no input files
+compilation terminated.
+Compiling the CXX compiler identification source file "CMakeCXXCompilerId.cpp" failed.
+Compiler: /usr/bin/c++ 
+Build flags: -D_GLIBCXX_USE_CXX11_ABI=0”;CXXFLAGS=”-fno-rtti
+Id flags: 
+
+The output was:
+1
+c++: error: CXXFLAGS=”-fno-rtti: No such file or directory
+
+
+Compiling the CXX compiler identification source file "CMakeCXXCompilerId.cpp" failed.
+Compiler: /usr/bin/c++ 
+Build flags: -D_GLIBCXX_USE_CXX11_ABI=0”;CXXFLAGS=”-fno-rtti
+Id flags: -c
+
+The output was:
+1
+c++: error: CXXFLAGS=”-fno-rtti: No such file or directory
+
+
+Checking whether the CXX compiler is IAR using "" did not match "IAR .+ Compiler":
+c++: error: CXXFLAGS=”-fno-rtti: No such file or directory
+c++: fatal error: no input files
+compilation terminated.
+Determining if the include file util.h exists failed with the following output:
+Change Dir: /home/phli/klee/build/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_dc32c/fast"
+/usr/bin/make -f CMakeFiles/cmTC_dc32c.dir/build.make CMakeFiles/cmTC_dc32c.dir/build
+make[1]: Entering directory '/home/phli/klee/build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_dc32c.dir/CheckIncludeFile.c.o
+/usr/bin/cc    -Wall -Wextra -Wno-unused-parameter    -o CMakeFiles/cmTC_dc32c.dir/CheckIncludeFile.c.o   -c /home/phli/klee/build/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+/home/phli/klee/build/CMakeFiles/CMakeTmp/CheckIncludeFile.c:1:18: fatal error: util.h: No such file or directory
+ #include <util.h>
+                  ^
+compilation terminated.
+CMakeFiles/cmTC_dc32c.dir/build.make:65: recipe for target 'CMakeFiles/cmTC_dc32c.dir/CheckIncludeFile.c.o' failed
+make[1]: *** [CMakeFiles/cmTC_dc32c.dir/CheckIncludeFile.c.o] Error 1
+make[1]: Leaving directory '/home/phli/klee/build/CMakeFiles/CMakeTmp'
+Makefile:126: recipe for target 'cmTC_dc32c/fast' failed
+make: *** [cmTC_dc32c/fast] Error 2
+
+
+Determining if the include file libutil.h exists failed with the following output:
+Change Dir: /home/phli/klee/build/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_f6ce4/fast"
+/usr/bin/make -f CMakeFiles/cmTC_f6ce4.dir/build.make CMakeFiles/cmTC_f6ce4.dir/build
+make[1]: Entering directory '/home/phli/klee/build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_f6ce4.dir/CheckIncludeFile.c.o
+/usr/bin/cc    -Wall -Wextra -Wno-unused-parameter    -o CMakeFiles/cmTC_f6ce4.dir/CheckIncludeFile.c.o   -c /home/phli/klee/build/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+/home/phli/klee/build/CMakeFiles/CMakeTmp/CheckIncludeFile.c:1:21: fatal error: libutil.h: No such file or directory
+ #include <libutil.h>
+                     ^
+compilation terminated.
+CMakeFiles/cmTC_f6ce4.dir/build.make:65: recipe for target 'CMakeFiles/cmTC_f6ce4.dir/CheckIncludeFile.c.o' failed
+make[1]: *** [CMakeFiles/cmTC_f6ce4.dir/CheckIncludeFile.c.o] Error 1
+make[1]: Leaving directory '/home/phli/klee/build/CMakeFiles/CMakeTmp'
+Makefile:126: recipe for target 'cmTC_f6ce4/fast' failed
+make: *** [cmTC_f6ce4/fast] Error 2
+
+
+Determining if the function openpty exists failed with the following output:
+Change Dir: /home/phli/klee/build/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_93868/fast"
+/usr/bin/make -f CMakeFiles/cmTC_93868.dir/build.make CMakeFiles/cmTC_93868.dir/build
+make[1]: Entering directory '/home/phli/klee/build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_93868.dir/CheckFunctionExists.c.o
+/usr/bin/cc    -Wall -Wextra -Wno-unused-parameter -DCHECK_FUNCTION_EXISTS=openpty   -o CMakeFiles/cmTC_93868.dir/CheckFunctionExists.c.o   -c /usr/share/cmake-3.7/Modules/CheckFunctionExists.c
+Linking C executable cmTC_93868
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_93868.dir/link.txt --verbose=1
+/usr/bin/cc   -Wall -Wextra -Wno-unused-parameter -DCHECK_FUNCTION_EXISTS=openpty    CMakeFiles/cmTC_93868.dir/CheckFunctionExists.c.o  -o cmTC_93868 -rdynamic 
+CMakeFiles/cmTC_93868.dir/CheckFunctionExists.c.o: In function `main':
+CheckFunctionExists.c:(.text+0x15): undefined reference to `openpty'
+collect2: error: ld returned 1 exit status
+CMakeFiles/cmTC_93868.dir/build.make:97: recipe for target 'cmTC_93868' failed
+make[1]: *** [cmTC_93868] Error 1
+make[1]: Leaving directory '/home/phli/klee/build/CMakeFiles/CMakeTmp'
+Makefile:126: recipe for target 'cmTC_93868/fast' failed
+make: *** [cmTC_93868/fast] Error 2
+
+
+Determining if the malloc_zone_statistics exist failed with the following output:
+Change Dir: /home/phli/klee/build/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_c6379/fast"
+/usr/bin/make -f CMakeFiles/cmTC_c6379.dir/build.make CMakeFiles/cmTC_c6379.dir/build
+make[1]: Entering directory '/home/phli/klee/build/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_c6379.dir/CheckSymbolExists.cxx.o
+/usr/bin/c++     -fno-rtti -Wall -Wextra -Wno-unused-parameter    -o CMakeFiles/cmTC_c6379.dir/CheckSymbolExists.cxx.o -c /home/phli/klee/build/CMakeFiles/CMakeTmp/CheckSymbolExists.cxx
+/home/phli/klee/build/CMakeFiles/CMakeTmp/CheckSymbolExists.cxx:2:27: fatal error: malloc/malloc.h: No such file or directory
+ #include <malloc/malloc.h>
+                           ^
+compilation terminated.
+CMakeFiles/cmTC_c6379.dir/build.make:65: recipe for target 'CMakeFiles/cmTC_c6379.dir/CheckSymbolExists.cxx.o' failed
+make[1]: *** [CMakeFiles/cmTC_c6379.dir/CheckSymbolExists.cxx.o] Error 1
+make[1]: Leaving directory '/home/phli/klee/build/CMakeFiles/CMakeTmp'
+Makefile:126: recipe for target 'cmTC_c6379/fast' failed
+make: *** [cmTC_c6379/fast] Error 2
+
+File /home/phli/klee/build/CMakeFiles/CMakeTmp/CheckSymbolExists.cxx:
+/* */
+#include <malloc/malloc.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef malloc_zone_statistics
+  return ((int*)(&malloc_zone_statistics))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+
+Determining if the include file selinux/selinux.h exists failed with the following output:
+Change Dir: /home/phli/klee/build/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_07937/fast"
+/usr/bin/make -f CMakeFiles/cmTC_07937.dir/build.make CMakeFiles/cmTC_07937.dir/build
+make[1]: Entering directory '/home/phli/klee/build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_07937.dir/CheckIncludeFile.c.o
+/usr/bin/cc    -Wall -Wextra -Wno-unused-parameter    -o CMakeFiles/cmTC_07937.dir/CheckIncludeFile.c.o   -c /home/phli/klee/build/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+/home/phli/klee/build/CMakeFiles/CMakeTmp/CheckIncludeFile.c:1:29: fatal error: selinux/selinux.h: No such file or directory
+ #include <selinux/selinux.h>
+                             ^
+compilation terminated.
+CMakeFiles/cmTC_07937.dir/build.make:65: recipe for target 'CMakeFiles/cmTC_07937.dir/CheckIncludeFile.c.o' failed
+make[1]: *** [CMakeFiles/cmTC_07937.dir/CheckIncludeFile.c.o] Error 1
+make[1]: Leaving directory '/home/phli/klee/build/CMakeFiles/CMakeTmp'
+Makefile:126: recipe for target 'cmTC_07937/fast' failed
+make: *** [cmTC_07937/fast] Error 2
+
+
+Determining if the include file sys/acl.h exists failed with the following output:
+Change Dir: /home/phli/klee/build/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_cbf0c/fast"
+/usr/bin/make -f CMakeFiles/cmTC_cbf0c.dir/build.make CMakeFiles/cmTC_cbf0c.dir/build
+make[1]: Entering directory '/home/phli/klee/build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_cbf0c.dir/CheckIncludeFile.c.o
+/usr/bin/cc    -Wall -Wextra -Wno-unused-parameter    -o CMakeFiles/cmTC_cbf0c.dir/CheckIncludeFile.c.o   -c /home/phli/klee/build/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+/home/phli/klee/build/CMakeFiles/CMakeTmp/CheckIncludeFile.c:1:21: fatal error: sys/acl.h: No such file or directory
+ #include <sys/acl.h>
+                     ^
+compilation terminated.
+CMakeFiles/cmTC_cbf0c.dir/build.make:65: recipe for target 'CMakeFiles/cmTC_cbf0c.dir/CheckIncludeFile.c.o' failed
+make[1]: *** [CMakeFiles/cmTC_cbf0c.dir/CheckIncludeFile.c.o] Error 1
+make[1]: Leaving directory '/home/phli/klee/build/CMakeFiles/CMakeTmp'
+Makefile:126: recipe for target 'cmTC_cbf0c/fast' failed
+make: *** [cmTC_cbf0c/fast] Error 2
+
+
+Performing C++ SOURCE FILE Test LLVM_PR39177_FIXED failed with the following output:
+Change Dir: /home/phli/klee/build/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_7e1e4/fast"
+/usr/bin/make -f CMakeFiles/cmTC_7e1e4.dir/build.make CMakeFiles/cmTC_7e1e4.dir/build
+make[1]: Entering directory '/home/phli/klee/build/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_7e1e4.dir/src.cxx.o
+/usr/bin/c++    -I/usr/lib/llvm-6.0/include  -fno-rtti -Wall -Wextra -Wno-unused-parameter -DLLVM_PR39177_FIXED   -o CMakeFiles/cmTC_7e1e4.dir/src.cxx.o -c /home/phli/klee/build/CMakeFiles/CMakeTmp/src.cxx
+Linking CXX executable cmTC_7e1e4
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_7e1e4.dir/link.txt --verbose=1
+/usr/bin/c++   -fno-rtti -Wall -Wextra -Wno-unused-parameter -DLLVM_PR39177_FIXED    CMakeFiles/cmTC_7e1e4.dir/src.cxx.o  -o cmTC_7e1e4 -Wl,-rpath,/usr/lib/llvm-6.0/lib -rdynamic /usr/lib/llvm-6.0/lib/libLLVM-6.0.so 
+make[1]: Leaving directory '/home/phli/klee/build/CMakeFiles/CMakeTmp'
+
+Return value: 1
+Source file was:
+
+    #include "llvm/Analysis/TargetLibraryInfo.h"
+    #include "llvm/AsmParser/Parser.h"
+    #include "llvm/AsmParser/SlotMapping.h"
+    #include "llvm/IR/ConstantFolder.h"
+    #include "llvm/IR/Constants.h"
+    #include "llvm/IR/DataLayout.h"
+    #include "llvm/IR/DiagnosticInfo.h"
+    #include "llvm/IR/Instructions.h"
+    #include "llvm/IR/IRBuilder.h"
+    #include "llvm/IR/LLVMContext.h"
+    #include "llvm/Transforms/Utils/BuildLibCalls.h"
+
+    #include <signal.h>
+
+    void handler(int, siginfo_t*, void*) {
+      // program received SIGSEGV
+      exit(1);
+    }
+
+    using namespace llvm;
+
+    int main() {
+      // capture segfault
+      struct sigaction action;
+      memset(&action, 0, sizeof(struct sigaction));
+      action.sa_flags = SA_SIGINFO;
+      action.sa_sigaction = handler;
+      sigaction(SIGSEGV, &action, NULL);
+
+      // setup test
+      LLVMContext Ctx;
+      SMDiagnostic Error;
+      SlotMapping Mapping;
+      auto M = llvm::parseAssemblyFile("/home/phli/klee/cmake/workaround_llvm_pr39177.ll", Error, Ctx, &Mapping);
+      if (!M) {
+        Error.print("AssemblyString", llvm::errs());
+        return -1;
+      }
+
+      auto *F = M->getFunction("test");
+      auto *CI = cast<CallInst>(&*std::next(F->begin()->begin()));
+      auto &DL = M->getDataLayout();
+      Value *Size = ConstantInt::get(DL.getIntPtrType(Ctx), 8);
+      ConstantFolder CF;
+      IRBuilder<> B(&*F->begin(), CF);
+      TargetLibraryInfo TLI = TargetLibraryInfoWrapperPass({"x86_64", "", "linux-gnu"}).getTLI();
+
+      // test if this call produces segfault
+      emitFWrite(CI->getArgOperand(1), Size, CI->getArgOperand(0), B, DL, &TLI);
+
+      return 0;
+    }
+Determining if the pthread_create exist failed with the following output:
+Change Dir: /home/phli/klee/build/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_5f203/fast"
+/usr/bin/make -f CMakeFiles/cmTC_5f203.dir/build.make CMakeFiles/cmTC_5f203.dir/build
+make[1]: Entering directory '/home/phli/klee/build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_5f203.dir/CheckSymbolExists.c.o
+/usr/bin/cc    -Wall -Wextra -Wno-unused-parameter    -o CMakeFiles/cmTC_5f203.dir/CheckSymbolExists.c.o   -c /home/phli/klee/build/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+Linking C executable cmTC_5f203
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_5f203.dir/link.txt --verbose=1
+/usr/bin/cc   -Wall -Wextra -Wno-unused-parameter     CMakeFiles/cmTC_5f203.dir/CheckSymbolExists.c.o  -o cmTC_5f203 -rdynamic 
+CMakeFiles/cmTC_5f203.dir/CheckSymbolExists.c.o: In function `main':
+CheckSymbolExists.c:(.text+0x1b): undefined reference to `pthread_create'
+collect2: error: ld returned 1 exit status
+CMakeFiles/cmTC_5f203.dir/build.make:97: recipe for target 'cmTC_5f203' failed
+make[1]: *** [cmTC_5f203] Error 1
+make[1]: Leaving directory '/home/phli/klee/build/CMakeFiles/CMakeTmp'
+Makefile:126: recipe for target 'cmTC_5f203/fast' failed
+make: *** [cmTC_5f203/fast] Error 2
+
+File /home/phli/klee/build/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <pthread.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef pthread_create
+  return ((int*)(&pthread_create))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+
+Determining if the function pthread_create exists in the pthreads failed with the following output:
+Change Dir: /home/phli/klee/build/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_279a9/fast"
+/usr/bin/make -f CMakeFiles/cmTC_279a9.dir/build.make CMakeFiles/cmTC_279a9.dir/build
+make[1]: Entering directory '/home/phli/klee/build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_279a9.dir/CheckFunctionExists.c.o
+/usr/bin/cc    -Wall -Wextra -Wno-unused-parameter -DCHECK_FUNCTION_EXISTS=pthread_create   -o CMakeFiles/cmTC_279a9.dir/CheckFunctionExists.c.o   -c /usr/share/cmake-3.7/Modules/CheckFunctionExists.c
+Linking C executable cmTC_279a9
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_279a9.dir/link.txt --verbose=1
+/usr/bin/cc   -Wall -Wextra -Wno-unused-parameter -DCHECK_FUNCTION_EXISTS=pthread_create    CMakeFiles/cmTC_279a9.dir/CheckFunctionExists.c.o  -o cmTC_279a9 -rdynamic -lpthreads 
+/usr/bin/ld: cannot find -lpthreads
+collect2: error: ld returned 1 exit status
+CMakeFiles/cmTC_279a9.dir/build.make:97: recipe for target 'cmTC_279a9' failed
+make[1]: *** [cmTC_279a9] Error 1
+make[1]: Leaving directory '/home/phli/klee/build/CMakeFiles/CMakeTmp'
+Makefile:126: recipe for target 'cmTC_279a9/fast' failed
+make: *** [cmTC_279a9/fast] Error 2
+
+

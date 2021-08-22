@@ -1,0 +1,198 @@
+Grammar
+
+    0 $accept: statement_list $end
+
+    1 statement_list: statement_list statement
+    2               | %empty
+
+    3 statement: string '=' string_or_value
+    4          | string
+    5          | EXTENSION '=' string
+    6          | SECTION
+    7          | '\n'
+
+    8 string: STRING
+    9       | ENCAPSULATED_STRING
+
+   10 string_or_value: string
+   11                | CFG_TRUE
+   12                | CFG_FALSE
+   13                | '\n'
+
+
+Terminals, with rules where they appear
+
+$end (0) 0
+'\n' (10) 7 13
+'=' (61) 3 5
+error (256)
+STRING (258) 8
+ENCAPSULATED_STRING (259) 9
+SECTION (260) 6
+CFG_TRUE (261) 11
+CFG_FALSE (262) 12
+EXTENSION (263) 5
+
+
+Nonterminals, with rules where they appear
+
+$accept (11)
+    on left: 0
+statement_list (12)
+    on left: 1 2, on right: 0 1
+statement (13)
+    on left: 3 4 5 6 7, on right: 1
+string (14)
+    on left: 8 9, on right: 3 4 5 10
+string_or_value (15)
+    on left: 10 11 12 13, on right: 3
+
+
+State 0
+
+    0 $accept: . statement_list $end
+
+    $default  reduce using rule 2 (statement_list)
+
+    statement_list  go to state 1
+
+
+State 1
+
+    0 $accept: statement_list . $end
+    1 statement_list: statement_list . statement
+
+    $end                 shift, and go to state 2
+    STRING               shift, and go to state 3
+    ENCAPSULATED_STRING  shift, and go to state 4
+    SECTION              shift, and go to state 5
+    EXTENSION            shift, and go to state 6
+    '\n'                 shift, and go to state 7
+
+    statement  go to state 8
+    string     go to state 9
+
+
+State 2
+
+    0 $accept: statement_list $end .
+
+    $default  accept
+
+
+State 3
+
+    8 string: STRING .
+
+    $default  reduce using rule 8 (string)
+
+
+State 4
+
+    9 string: ENCAPSULATED_STRING .
+
+    $default  reduce using rule 9 (string)
+
+
+State 5
+
+    6 statement: SECTION .
+
+    $default  reduce using rule 6 (statement)
+
+
+State 6
+
+    5 statement: EXTENSION . '=' string
+
+    '='  shift, and go to state 10
+
+
+State 7
+
+    7 statement: '\n' .
+
+    $default  reduce using rule 7 (statement)
+
+
+State 8
+
+    1 statement_list: statement_list statement .
+
+    $default  reduce using rule 1 (statement_list)
+
+
+State 9
+
+    3 statement: string . '=' string_or_value
+    4          | string .
+
+    '='  shift, and go to state 11
+
+    $default  reduce using rule 4 (statement)
+
+
+State 10
+
+    5 statement: EXTENSION '=' . string
+
+    STRING               shift, and go to state 3
+    ENCAPSULATED_STRING  shift, and go to state 4
+
+    string  go to state 12
+
+
+State 11
+
+    3 statement: string '=' . string_or_value
+
+    STRING               shift, and go to state 3
+    ENCAPSULATED_STRING  shift, and go to state 4
+    CFG_TRUE             shift, and go to state 13
+    CFG_FALSE            shift, and go to state 14
+    '\n'                 shift, and go to state 15
+
+    string           go to state 16
+    string_or_value  go to state 17
+
+
+State 12
+
+    5 statement: EXTENSION '=' string .
+
+    $default  reduce using rule 5 (statement)
+
+
+State 13
+
+   11 string_or_value: CFG_TRUE .
+
+    $default  reduce using rule 11 (string_or_value)
+
+
+State 14
+
+   12 string_or_value: CFG_FALSE .
+
+    $default  reduce using rule 12 (string_or_value)
+
+
+State 15
+
+   13 string_or_value: '\n' .
+
+    $default  reduce using rule 13 (string_or_value)
+
+
+State 16
+
+   10 string_or_value: string .
+
+    $default  reduce using rule 10 (string_or_value)
+
+
+State 17
+
+    3 statement: string '=' string_or_value .
+
+    $default  reduce using rule 3 (statement)

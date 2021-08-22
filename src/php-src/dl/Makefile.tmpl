@@ -1,0 +1,104 @@
+# +----------------------------------------------------------------------+
+# | PHP HTML Embedded Scripting Language Version 3.0                     |
+# +----------------------------------------------------------------------+
+# | Copyright (c) 1997,1998 PHP Development Team (See Credits file)      |
+# +----------------------------------------------------------------------+
+# | This program is free software; you can redistribute it and/or modify |
+# | it under the terms of one of the following licenses:                 |
+# |                                                                      |
+# |  A) the GNU General Public License as published by the Free Software |
+# |     Foundation; either version 2 of the License, or (at your option) |
+# |     any later version.                                               |
+# |                                                                      |
+# |  B) the PHP License as published by the PHP Development Team and     |
+# |     included in the distribution in the file: LICENSE                |
+# |                                                                      |
+# | This program is distributed in the hope that it will be useful,      |
+# | but WITHOUT ANY WARRANTY; without even the implied warranty of       |
+# | MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the        |
+# | GNU General Public License for more details.                         |
+# |                                                                      |
+# | You should have received a copy of both licenses referred to here.   |
+# | If you did not, or have any questions about PHP licensing, please    |
+# | contact core@php.net.                                                |
+# +----------------------------------------------------------------------+
+
+CC = @CC@
+LD = @LD@
+
+all: calendar.so
+
+CAL_OBJS =  calendar/calendar.o calendar/dow.o calendar/french.o \
+            calendar/gregor.o calendar/jewish.o calendar/julian.o \
+            calendar/easter.o
+
+IFX_OBJ = informix/ifx.o
+
+IFX_LIBS = -L$(INFORMIXDIR)/lib -L$(INFORMIXDIR)/lib/esql \
+	-lifsql \
+	-lifasf \
+	-lifgen \
+	-lifos \
+	-lifgls \
+	-lm \
+	-ldl \
+	-lcrypt \
+	$(INFORMIXDIR)/lib/esql/checkapi.o \
+	-lifglx
+
+calendar.so: $(CAL_OBJS)
+	$(LD) -o $@ $(CAL_OBJS)
+
+calendar/%.o: calendar/%.c
+	$(CC) $(CFLAGS) -DCOMPILE_DL=1 -c -o $@ $<
+
+informix/ifx.o:	../functions/ifx.ec
+	esql -c -EDHAVE_IFX_US=1 -DCOMPILE_DL=1 -I.. -I../functions \
+		../functions/ifx.ec -o informix/ifx.o
+
+ifx.so: $(IFX_OBJ)
+	$(LD) -o $@ $(IFX_OBJ) $(IFX_LIBS)
+	
+
+snmp.so: snmp/snmp.o
+	$(LD) -o $@ snmp/snmp.o -lsnmp
+
+snmp/%.o: snmp/%.c
+	$(CC) $(CFLAGS) -DCOMPILE_DL=1 -c -o $@ $<
+
+imap.so: imap/imap.o
+	$(LD) -o $@ imap/imap.o /usr/local/lib/c-client.a
+
+imap/%.o: imap/%.c
+	$(CC) $(CFLAGS) -DCOMPILE_DL=1 -c -o $@ $<
+
+crypt.so: crypt/crypt.o crypt/sflcryp.o
+	$(LD) -o $@ crypt/crypt.o crypt/sflcryp.o
+
+crypt/%.o: crypt/%.c
+	$(CC) $(CFLAGS) -DCOMPILE_DL=1 -c -o $@ $<
+
+LOG_OBJS = log/log.o log/log_db.o #log/log_sql.o
+log.so: $(LOG_OBJS)
+	$(LD) -o $@ $(LOG_OBJS)
+
+log/%.o: log/%.c
+	$(CC) $(CFLAGS) -DCOMPILE_DL=1 -c -o $@ $<
+
+IBASE_LIBS = -L$(IBASE_LIBDIR)/lib \
+	-lgds \
+	-lm \
+	-ldl
+        
+interbase.so: interbase/interbase.o
+	$(LD) -o $@ interbase/interbase.o $(IBASE_LIBS)
+
+interbase/interbase.o: ../functions/interbase.c ../functions/php3_interbase.h
+	$(CC) $(CFLAGS) -DCOMPILE_DL=1 -c -o $@ $<
+
+clean:
+	-rm -f *.so */*.o perl.out
+
+# Local Variables:
+# tab-width: 4
+# End:

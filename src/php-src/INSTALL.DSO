@@ -1,0 +1,95 @@
+Compiling PHP as an Apache Dynamic Shared Object (DSO)
+------------------------------------------------------
+
+Before you begin, check that your installed Apache version
+is at least version 1.3.6.  Version 1.3.9 or later is even
+better and you should seriously consider upgrading your Apache
+to 1.3.9 or later.  This is especially true for glibc-2.1.1 
+users.  There was a nasty bug related to how DSO's were
+linked that wasn't fixed until Apache-1.3.9.
+
+In order for this build method to work, your server must have 
+been built to include mod_so (you can check by typing httpd -l)
+and it needs to have the 'apxs' Perl script installed and
+configured for your setup.  You can build such a server setup
+using Step 1 below.  
+
+Step 1: Build Apache once (if not already built) and make sure
+mod_so is enabled.  Something like this would do the trick:
+
+   cd apache-1.3.x
+   ./configure --prefix=/some/path --enable-shared=max
+   make
+   make install
+
+Refer to the README.configure file in the Apache distribution for full
+details on Apache configure options.  Make sure /some/path/bin/apxs
+exists at this point.  You need to know where to find this 'apxs'
+program in order to move onto step 2.
+
+Step 2: Build PHP
+
+   cd php-3.0.x
+   ./configure  --with-apxs=/some/path/bin/apxs \
+                --with-config-file-path=/some/path
+  make
+  make install
+
+You will of course most likely want more options here.  Run 
+./configure --help for a full list.  If you are running Apache-1.3.9
+or later, you should add the --with-xml switch since an xml parser
+was included in Apache as of version 1.3.9 and you might as well
+let PHP use it if it is there anyway.
+
+Step 3: Edit /some/path/conf/httpd.conf and make sure you have a 
+line similar to:
+
+  AddType application/x-httpd-php3 .php3
+
+If this is a brand new setup, you should of course also set the
+other Apache site-specific things in your httpd.conf.  
+
+Additionally you need to tell Apache to load and activate the 
+PHP module. Add the following line to /some/path/conf/httpd.conf
+
+    LoadModule php3_module libexec/libphp3.so
+
+If you have a ClearModuleList in your httpd.conf file, you need
+to add this line to:
+
+    AddModule mod_php3.c 
+
+You should also copy php3.ini-dist to /some/path/php3.ini and have a 
+look at it.
+
+Step 4: Start/Restart your server:
+
+   /some/path/bin/apachectl start
+
+or 
+
+   /some/path/bin/apachectl restart
+
+or
+   /some/path/bin/apachectl graceful
+
+
+Troubleshooting
+---------------
+
+If you are compiling PHP with support for a whole whack of modules and
+want to load the whole mess dynamically, you may find yourself getting
+the following error:
+
+ld: fatal: too many symbols require `small' PIC references:
+        have 2077, maximum 2048 -- recompile some modules -K PIC.
+
+This should not happen on any Intel platforms, but I ran across it on
+a Sun Sparc box running Solaris.  The message which comes from the
+linker is assuming I am using the native Sun C compiler I guess and
+suggests I use "-K PIC".  This may be correct if you are using that
+compiler.  For gcc the way to fix it is to edit the PHP Makefile and
+near the top find the line that says: CFLAGS_SHLIB = -fpic
+and change the "-fpic" to "-fPIC".  I would imagine that this would
+slow things down a bit though and you might want to consider doing a
+static build instead.

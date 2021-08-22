@@ -1,0 +1,3134 @@
+dnl $Id: configure.in,v 1.506 2000/06/14 11:58:08 eschmid Exp $
+dnl Process this file with autoconf to produce a configure script.
+
+AC_INIT(main.c)
+
+PHP_VERSION=`cut -d\" -f 2 $srcdir/php_version.h`
+AC_SUBST(PHP_VERSION)
+
+AC_CONFIG_HEADER(config.h)
+AM_SANITY_CHECK
+AM_MAINTAINER_MODE
+
+CONFIGURE_COMMAND=$0
+for arg in "$@"; do
+    CONFIGURE_COMMAND="$CONFIGURE_COMMAND '$arg'"
+done
+AC_SUBST(CONFIGURE_COMMAND)
+
+dnl We want this one before the checks, so the checks can modify CFLAGS.
+test -z "$CFLAGS" && auto_cflags=1
+
+dnl Checks for programs.
+AC_PROG_YACC
+if test "$YACC" != "bison -y"; then
+    AC_MSG_WARN(You will need bison if you'd want to regenerate the PHP 3.0 parsers.)
+else
+    AC_MSG_CHECKING(bison version)
+    set `bison --version| sed -e 's/^GNU Bison version //' -e 's/\./ /g'`
+    if test "$1" = "1" -a "$2" -lt "25"; then
+        AC_MSG_WARN(You will need bison 1.25 if you'd want to regenerate the PHP 3.0 parsers (found $1.$2).)
+    fi
+    AC_MSG_RESULT($1.$2 (ok))
+fi
+AC_PROG_CC
+AM_PROG_CC_STDC
+AC_PROG_RANLIB
+AC_PROG_CC_C_O
+AC_PROG_LN_S
+AC_PATH_PROG(PERL_PATH, perl)
+AC_PATH_PROG(SH, sh, /bin/sh)
+
+dnl Make flex scanners use const if they can, even if __STDC__ is not
+dnl true, for compilers like Sun's that only set __STDC__ true in
+dnl "limit-to-ANSI-standard" mode, not in "ANSI-compatible" mode
+AC_C_CONST
+if test "$ac_cv_c_const" = "yes" ; then
+  LEX_CFLAGS="-DYY_USE_CONST"
+fi
+AC_SUBST(LEX_CFLAGS)
+    
+dnl Ugly hack to get around a problem with gcc on AIX.
+if test "$CC" = "gcc" -a "$ac_cv_prog_cc_g" = "yes" -a \
+   "`uname -sv`" = "AIX 4"; then
+	CFLAGS=`echo $CFLAGS | sed -e 's/-g//'`
+fi
+
+if test "`uname -sv`" = "AIX 4" -a "$GCC" != "yes"; then
+	APXS_EXP="-bE:mod_php3.exp"
+fi
+AC_SUBST(APXS_EXP)
+
+dnl Hack to work around a Mac OS X Server cpp problem
+dnl Known versions needing this workaround are 5.3 and 5.4
+if test "$ac_cv_prog_gcc" = "yes" -a "`uname -s`" = "Rhapsody"; then
+        CPPFLAGS="$CPPFLAGS -traditional-cpp"
+fi
+
+dnl check for -R, etc. switch
+AC_MSG_CHECKING(if compiler supports -R)
+AC_CACHE_VAL(php_cv_cc_dashr,[
+	SAVE_LIBS="${LIBS}"
+	LIBS="-R /usr/lib ${LIBS}"
+	AC_TRY_LINK([], [], php_cv_cc_dashr=yes, php_cv_cc_dashr=no)
+	LIBS="${SAVE_LIBS}"])
+AC_MSG_RESULT($php_cv_cc_dashr)
+if test $php_cv_cc_dashr = "yes"; then
+	ld_runpath_switch="-R"
+	apxs_runpath_switch="-Wl,-R'"
+else
+	AC_MSG_CHECKING([if compiler supports -Wl,-rpath,])
+	AC_CACHE_VAL(php_cv_cc_rpath,[
+		SAVE_LIBS="${LIBS}"
+		LIBS="-Wl,-rpath,/usr/lib ${LIBS}"
+		AC_TRY_LINK([], [], php_cv_cc_rpath=yes, php_cv_cc_rpath=no)
+		LIBS="${SAVE_LIBS}"])
+	AC_MSG_RESULT($php_cv_cc_rpath)
+	if test $php_cv_cc_rpath = "yes"; then
+		ld_runpath_switch="-Wl,-rpath,"
+		apxs_runpath_switch="-Wl,'-rpath "
+	else
+		dnl something innocuous
+		ld_runpath_switch="-L"
+		apxs_runpath_switch="-L'"
+	fi
+fi
+
+AC_MSG_CHECKING([if compiler supports -Wl,--version-script])
+AC_CACHE_VAL(php_cv_cc_vscript,[
+        SLIBS=$LIBS
+        LIBS="-Wl,--version-script=$srcdir/php.map $LIBS"
+        AC_TRY_LINK([],[],php_cv_cc_vscript=yes,php_cv_cc_vscript=no)
+        LIBS=$SLIBS ])
+AC_MSG_RESULT($php_cv_cc_vscript)
+
+AC_CHECK_SIZEOF(long, 8)
+AC_CHECK_SIZEOF(int, 4)
+
+dnl AC_PROG_INSTALL
+AC_PATH_PROG(PROG_SENDMAIL, sendmail, /usr/lib/sendmail, $PATH /usr/bin /usr/sbin /usr/etc /etc /usr/ucblib)
+if test -n "$PROG_SENDMAIL"; then
+  AC_DEFINE(HAVE_SENDMAIL)
+fi
+
+dnl
+dnl Check for /usr/pkg/{lib,include} which is where NetBSD puts binary
+dnl and source packages.  This should be harmless on other OSs.
+dnl
+if test -d /usr/pkg/include -a -d /usr/pkg/lib ; then
+       CFLAGS="$CFLAGS -I/usr/pkg/include"
+       LDFLAGS="$LDFLAGS -L/usr/pkg/lib"
+fi
+
+AC_CHECK_FUNC(gethostent, [], [
+  AC_CHECK_LIB(nsl, gethostent, [
+    LIBS="-lnsl $LIBS"
+    AC_DEFINE(HAVE_LIBNSL) ], [])])
+
+AC_CHECK_LIB(c, socket, [:], [
+ AC_CHECK_LIB(socket, socket, [
+  LIBS="-lsocket $LIBS"
+  AC_DEFINE(HAVE_LIBSOCKET) ], []) ])
+
+AC_CHECK_LIB(c, gethostbyaddr, [:], [
+ AC_CHECK_LIB(nsl, gethostbyaddr, [
+  LIBS="-lnsl $LIBS"
+  AC_DEFINE(HAVE_LIBNSL) ], []) ])
+
+AC_CHECK_LIB(c, crypt, [:], [
+ AC_CHECK_LIB(crypt, crypt, [
+  LIBS="-lcrypt $LIBS"
+  AC_DEFINE(HAVE_LIBCRYPT) 
+ ],[
+  AC_CHECK_LIB(ufc, crypt, [
+    LIBS="-lufc $LIBS"
+    AC_DEFINE(HAVE_LIBCRYPT)
+  ])
+ ]) 
+])
+
+AC_CHECK_LIB(c, dlopen, [
+ # fake it
+ AC_DEFINE(HAVE_LIBDL) ], [
+ AC_CHECK_LIB(dl, dlopen, [
+  LIBS="-ldl $LIBS"
+  AC_DEFINE(HAVE_LIBDL) ], []) ])
+
+dnl The sin may be in a library which need not be specifed
+dnl as well as res_search resides in libsocket
+AC_CHECK_LIB(c, sin, [:], [
+ AC_CHECK_LIB(m, sin) ])
+
+dnl The res_search may be in libsocket as well, and if it is
+dnl make sure to check for dn_skipname in libresolv, or if res_search
+dnl is in neither of these libs, still check for dn_skipname in libresolv
+AC_CHECK_LIB(socket, res_search, [
+ AC_CHECK_LIB(resolv, dn_skipname)
+ AC_CHECK_LIB(resolv, __dn_skipname)
+ LIBS="$LIBS -lsocket"
+ AC_DEFINE(HAVE_LIBSOCKET) 
+], [
+ AC_CHECK_LIB(resolv, res_search, [
+  LIBS="$LIBS -lresolv"
+  AC_DEFINE(HAVE_LIBRESOLV) 
+ ], [
+  AC_CHECK_LIB(resolv, dn_skipname)
+  AC_CHECK_LIB(resolv, __dn_skipname)
+ ]) 
+])
+
+dnl If libpam is available, we might need it
+AC_CHECK_LIB(pam, pam_start, [
+  LIBS="-lpam $LIBS"
+  AC_DEFINE(HAVE_LIBPAM) ], [])
+
+AC_CHECK_LIB(bind, inet_aton, [
+  LIBS="$LIBS -lbind" ], [])
+
+dnl Checks for header files.
+AC_HEADER_STDC
+
+dnl In QNX opendir resides in libc but dirent.h is still required
+if test "`uname -s 2>/dev/null`" != "QNX"; then
+	AC_HEADER_DIRENT
+else
+	AC_CHECK_HEADERS(dirent.h)
+fi
+AC_MISSING_FCLOSE_DECL
+dnl QNX requires unix.h to allow functions in libunix to work properly
+AC_CHECK_HEADERS(fcntl.h stdlib.h unistd.h crypt.h sys/file.h memory.h pwd.h grp.h sys/socket.h sys/wait.h syslog.h string.h sys/varargs.h stdarg.h sys/resource.h sys/time.h signal.h netinet/in.h dlfcn.h limits.h sys/types.h sys/statvfs.h sys/statfs.h unix.h db.h dbm.h ndbm.h db1/ndbm.h locale.h features.h)
+
+dnl Checks for typedefs, structures, and compiler characteristics.
+AC_STRUCT_TM
+AC_STRUCT_TIMEZONE
+
+AC_CACHE_CHECK([for tm_gmtoff in struct tm], ac_cv_struct_tm_gmtoff,
+[AC_TRY_COMPILE([#include <sys/types.h>
+#include <$ac_cv_struct_tm>], [struct tm tm; tm.tm_gmtoff;],
+  ac_cv_struct_tm_gmtoff=yes, ac_cv_struct_tm_gmtoff=no)])
+
+if test "$ac_cv_struct_tm_gmtoff" = yes; then
+  AC_DEFINE(HAVE_TM_GMTOFF)
+fi
+
+AC_CACHE_CHECK(for struct flock,php_struct_flock,
+    AC_TRY_COMPILE([
+#include <unistd.h>
+#include <fcntl.h>
+        ],
+        [struct flock x;],
+        [
+          php_struct_flock=yes
+        ],[
+          php_struct_flock=no
+        ])
+)
+if test "$php_struct_flock" = "yes" ; then
+    AC_DEFINE(HAVE_STRUCT_FLOCK, 1)
+else
+    AC_DEFINE(HAVE_STRUCT_FLOCK, 0)
+fi
+
+dnl Check for members of the stat structure
+AC_STRUCT_ST_BLKSIZE
+dnl AC_STRUCT_ST_BLOCKS will screw QNX because fileblocks.o does not exists
+dnl The WARNING_LEVEL required because cc in QNX hates -w option without an argument
+if test "`uname -s 2>/dev/null`" != "QNX"; then
+	if test "`uname -s 2>/dev/null`" != "OS/2"; then
+		AC_STRUCT_ST_BLOCKS
+	fi
+else
+    AC_MSG_WARN(warnings level for cc set to 0)
+	WARNING_LEVEL=0
+	AC_SUBST(WARNING_LEVEL)
+fi
+AC_STRUCT_ST_RDEV
+
+dnl Checks for types
+AC_TYPE_SIZE_T
+AC_TYPE_UID_T
+dnl This is required for QNX and may be some BSD derived systems
+AC_CHECK_TYPE( uint, unsigned int )
+AC_CHECK_TYPE( ushort, unsigned short )
+AC_CHECK_TYPE( ulong, unsigned long )
+AC_CHECK_TYPE(ptrdiff_t, unsigned long)
+	
+dnl Checks for library functions.
+AC_FUNC_VPRINTF
+AC_CHECK_FUNCS(memcpy memmove strdup strerror strcasecmp strstr flock lockf putenv tempnam usleep setlocale gettimeofday setvbuf srand48 lrand48 srandom random link symlink regcomp getlogin cuserid vsnprintf gcvt utime crypt setitimer rint unsetenv strftime setsockopt tzset statvfs statfs inet_aton shutdown truncate getpgid getsid getrlimit snprintf ctermid setsid mkfifo getrusage)
+AC_FUNC_UTIME_NULL
+AC_FUNC_ALLOCA
+AC_BROKEN_SPRINTF
+AC_REPLACE_FUNCS(getopt)
+
+PHP_DECLARED_TIMEZONE
+
+dnl AIX keeps in_addr_t in /usr/include/netinet/in.h
+dnl AC_MSG_CHECKING(for in_addr_t)
+AC_CACHE_VAL(ac_cv_type_$1,
+[AC_EGREP_CPP(dnl
+changequote(<<,>>)dnl
+<<in_addr_t[^a-zA-Z_0-9]>>dnl
+changequote([,]), [#include <sys/types.h>
+#if STDC_HEADERS
+#include <stdlib.h>
+#include <stddef.h>
+#endif
+#ifdef HAVE_NETINET_IN_H
+#include <netinet/in.h>
+#endif], ac_cv_type_in_addr_t=yes, ac_cv_type_in_addr_t=no)])dnl
+
+dnl AC_MSG_RESULT($ac_cv_type_in_addr_t)
+if test $ac_cv_type_in_addr_t = no; then
+  AC_DEFINE(in_addr_t, u_int)
+fi
+
+AC_CRYPT_CAP
+
+AC_MSG_CHECKING(for Apache module support via DSO through APXS)
+AC_ARG_WITH(apxs,
+[  --with-apxs[=FILE]      Build shared Apache module.  FILE is the optional
+                          pathname to the Apache apxs tool; defaults to "apxs".],
+[
+    if test "$withval" = "yes"; then
+        withval=apxs
+    fi
+    APXS="$withval"
+	APXS_LDFLAGS="@EXTRA_LIBS@ @SYBASE_CT_LFLAGS@ @SYBASE_CT_LIBS@ @FHTTPD_LIB@ @ORACLE_LFLAGS@ @ORACLE_LIBS@ @IODBC_LFLAGS@ @IODBC_LIBS@ @SYBASE_LFLAGS@ @SYBASE_LIBS@ @SYBASE_CT_LFLAGS@ @SYBASE_CT_LIBS@ @ADA_LFLAGS@ @ADA_LIBS@ @SOLID_LIBS@ @EMPRESS_LIBS@ @OPENLINK_LFLAGS@ @OPENLINK_LIBS@ @VELOCIS_LIBS@ @CODBC_LFLAGS@ @CODBC_LIBS@ @ZLIB_LIBS@ @PDFLIB_LIBS@ @CPDFLIB_LIBS@ @FDFLIB_LIBS@ @IFX_LFLAGS@ @IFX_LIBS@ @IBASE_LFLAGS@ @IBASE_LIBS@ @DBM_LIB@"
+
+    APACHE_INCLUDE="-I`$APXS -q INCLUDEDIR`"
+    BINNAME=libphp3.so
+    INSTALL_IT="\$(APXS) -i -a -n php3 $BINNAME"
+    CFLAGS_SHLIB="`$APXS -q CFLAGS_SHLIB`"
+    LDFLAGS_SHLIB="`$APXS -q LDFLAGS_SHLIB`"
+    CFLAGS="$CFLAGS `$APXS -q CFLAGS`"
+	if test "a`$APXS -q LD_SHLIB`" = "a" || test "`$APXS -q LIBEXECDIR`" = "modules"; then
+		PHP_APXS_BROKEN=yes
+	fi
+    PHP_LIBS=-L/usr/local/lib
+    STRONGHOLD=
+    AC_DEFINE(APACHE)
+    AC_SUBST(APXS)
+    AC_SUBST(APXS_LDFLAGS)
+    AC_SUBST(BINNAME)
+    AC_SUBST(INSTALL_IT)
+    AC_SUBST(PHP_LIBS)
+    AC_DEFINE(HAVE_AP_CONFIG_H)
+    AC_DEFINE(HAVE_AP_COMPAT_H)
+    AC_MSG_RESULT(yes)
+],[
+    AC_MSG_RESULT(no)
+])
+
+if test -n "$APXS" ; then
+  APXS_CC="`$APXS -q CC`"
+fi
+
+
+abs_srcdir="`(cd $srcdir && pwd)`"
+versioning="no"
+AC_MSG_CHECKING(whether to enable versioning)
+AC_ARG_ENABLE(versioning,
+[  --enable-versioning     Take advantage of versioning and scoping
+                          Provided by Solaris 2.x and Linux],
+[
+  if test "$enableval" = "yes" ; then
+    case "`uname -sr`" in
+    "SunOS 5"*)
+        VERSION_SCRIPT="-Wl,'-M $abs_srcdir/php.map'"
+    ;;
+    *)
+        if test "$php_cv_cc_vscript" = "yes" ; then
+          VERSION_SCRIPT="-Wl,--version-script=$abs_srcdir/php.map"
+        else
+          AC_MSG_ERROR(versioning is not supported on your OS)
+        fi
+    ;;
+    esac
+    versioning="yes"
+  fi
+])
+AC_MSG_RESULT($versioning)
+AC_SUBST(VERSION_SCRIPT)
+
+if test "$BINNAME" != "libmodphp3-so.a"; then
+if test "$BINNAME" != "libphp3.so"; then
+AC_MSG_CHECKING(for Apache module support)
+AC_ARG_WITH(apache,
+[  --with-apache[=DIR]     Build Apache module.  DIR is the top-level Apache
+                          build directory, defaults to /usr/local/etc/httpd.],
+[
+	if test "$withval" = "yes"; then
+	  # Apache's default directory
+	  withval=/usr/local/etc/httpd
+	fi
+	if test "$withval" != "no"; then
+	    APACHE_WITHVAL=$withval
+# figure out extra library nonsense
+# For Apache 1.2.x
+	  if test -f $withval/src/httpd.h; then 
+	    APACHE_INCLUDE=-I$withval/src
+	    APACHE_TARGET=$withval/src
+	    BINNAME=libphp3.a
+	    INSTALL_IT="mkdir -p $APACHE_TARGET; cp $BINNAME $srcdir/mod_php3.* $srcdir/php_version.h libphp3.module $extra_copy $APACHE_TARGET"
+	    PHP_LIBS="-L. -lphp3 $extra_l"
+	    AC_DEFINE(APACHE)
+	    AC_MSG_RESULT(yes - Apache 1.2.x)
+		STRONGHOLD=
+		if test -f $withval/src/ap_config.h; then
+		AC_DEFINE(HAVE_AP_CONFIG_H)
+		fi
+# For Apache 1.3.x
+	  elif test -f $withval/src/main/httpd.h; then
+	    APACHE_INCLUDE="-I$withval/src/main -I$withval/src/os/unix -I$withval/src/ap"
+	    APACHE_TARGET=$withval/src/modules/php3
+		if test ! -d $APACHE_TARGET; then
+			mkdir $APACHE_TARGET
+		fi
+	    BINNAME=libmodphp3.a
+	    INSTALL_IT="mkdir -p $APACHE_TARGET; cp $BINNAME $srcdir/mod_php3.* $srcdir/php_version.h libphp3.module $extra_copy $APACHE_TARGET; cp $srcdir/apMakefile.tmpl $APACHE_TARGET/Makefile.tmpl; cp $srcdir/apMakefile.libdir $APACHE_TARGET/Makefile.libdir"
+	    PHP_LIBS="-Lmodules/php3 -L../modules/php3 -L../../modules/php3 -lmodphp3 $extra_l"
+	    AC_DEFINE(APACHE)
+	    AC_MSG_RESULT(yes - Apache 1.3.x)
+		STRONGHOLD=
+		if test -f $withval/src/include/ap_config.h; then
+		AC_DEFINE(HAVE_AP_CONFIG_H)
+		fi
+		if test -f $withval/src/include/ap_compat.h; then
+		AC_DEFINE(HAVE_AP_COMPAT_H)
+		if test ! -f $withval/src/include/ap_config_auto.h; then
+    	AC_MSG_ERROR(Please run Apache's configure or src/Configure program once and try again)
+		fi
+		else
+		if test -f $withval/src/include/compat.h; then
+		AC_DEFINE(HAVE_OLD_COMPAT_H)
+		fi
+		fi
+# Also for Apache 1.3.x
+	  elif test -f $withval/src/include/httpd.h; then
+	    APACHE_INCLUDE="-I$withval/src/include -I$withval/src/os/unix"
+	    APACHE_TARGET=$withval/src/modules/php3
+		if test ! -d $APACHE_TARGET; then
+			mkdir $APACHE_TARGET
+		fi
+	    BINNAME=libmodphp3.a
+	    PHP_LIBS="-Lmodules/php3 -L../modules/php3 -L../../modules/php3 -lmodphp3 $extra_l"
+	    INSTALL_IT="mkdir -p $APACHE_TARGET; cp $BINNAME $srcdir/mod_php3.* $srcdir/php_version.h $extra_copy $APACHE_TARGET; cp $srcdir/apMakefile.tmpl $APACHE_TARGET/Makefile.tmpl; cp $srcdir/apMakefile.libdir $APACHE_TARGET/Makefile.libdir; cp libphp3.module $APACHE_TARGET"
+	    AC_DEFINE(APACHE)
+	    AC_MSG_RESULT(yes - Apache 1.3.x)
+		STRONGHOLD=
+		if test -f $withval/src/include/ap_config.h; then
+		AC_DEFINE(HAVE_AP_CONFIG_H)
+		fi
+		if test -f $withval/src/include/ap_compat.h; then
+		AC_DEFINE(HAVE_AP_COMPAT_H)
+		if test ! -f $withval/src/include/ap_config_auto.h; then
+    	AC_MSG_ERROR(Please run Apache's configure or src/Configure program once and try again)
+		fi
+		else
+		if test -f $withval/src/include/compat.h; then
+		AC_DEFINE(HAVE_OLD_COMPAT_H)
+		fi
+		fi
+# For StrongHold 2.2
+	  elif test -f $withval/apache/httpd.h; then
+	    APACHE_INCLUDE=-"I$withval/apache -I$withval/ssl/include"
+	    APACHE_TARGET=$withval/apache
+	    BINNAME=libmodphp3.a
+	    PHP_LIBS="-Lmodules/php3 -L../modules/php3 -L../../modules/php3 -lmodphp3 $extra_l"
+	    INSTALL_IT="mkdir -p $APACHE_TARGET; cp $BINNAME $srcdir/mod_php3.* $srcdir/php_version.h libphp3.module $extra_copy $APACHE_TARGET"
+		STRONGHOLD=-DSTRONGHOLD=1
+	    AC_DEFINE(APACHE)
+		AC_MSG_RESULT(yes - StrongHold)
+		if test -f $withval/apache/ap_config.h; then
+		AC_DEFINE(HAVE_AP_CONFIG_H)
+		fi
+		if test -f $withval/src/ap_compat.h; then
+		AC_DEFINE(HAVE_AP_COMPAT_H)
+		if test ! -f $withval/src/include/ap_config_auto.h; then
+    	AC_MSG_ERROR(Please run Apache's configure or src/Configure program once and try again)
+		fi
+		else
+		if test -f $withval/src/compat.h; then
+		AC_DEFINE(HAVE_OLD_COMPAT_H)
+		fi
+		fi
+	  else
+	    AC_MSG_RESULT(no)
+	    AC_MSG_ERROR(Invalid Apache directory - unable to find httpd.h under $withval)
+	  fi
+	else
+	  AC_MSG_RESULT(no)
+	  BINNAME=php
+	  INSTALL_IT="cp $BINNAME \$(bindir)"
+	fi
+],[
+	AC_MSG_RESULT(no)
+	BINNAME=php
+	INSTALL_IT="cp $BINNAME \$(bindir)"
+])
+AC_SUBST(APACHE_INCLUDE)
+AC_SUBST(APACHE_TARGET)
+AC_SUBST(INSTALL_IT)
+AC_SUBST(BINNAME)
+AC_SUBST(STRONGHOLD)
+AC_SUBST(PHP_LIBS)
+fi
+fi
+
+AC_MSG_CHECKING(whether to use bundled regex library)
+AC_ARG_WITH(system-regex,
+[  --with-system-regex     Do not use the bundled regex library],
+[
+	if test -n "$APXS"; then
+		if test -n "`$APXS -q CFLAGS | grep USE_HSREGEX`"; then		
+			REGEX_LIB=regex/libregex.a
+			HSREGEX=yes
+			AC_MSG_RESULT(yes)
+			AC_DEFINE(HSREGEX)
+			AC_DEFINE(REGEX,1)
+		else
+			REGEX_LIB=
+			HSREGEX=no
+			AC_MSG_RESULT(no)
+			AC_DEFINE(REGEX,0)
+		fi
+	else
+		if test "$withval" = "no"; then
+			REGEX_LIB=regex/libregex.a
+			HSREGEX=yes
+			AC_MSG_RESULT(yes)
+			AC_DEFINE(REGEX,1)
+		else
+			REGEX_LIB=
+			HSREGEX=no
+			AC_MSG_RESULT(no)
+			AC_DEFINE(REGEX,0)
+		fi
+	fi
+],[
+	if test -n "$APXS"; then
+		if test -n "`$APXS -q CFLAGS | grep USE_HSREGEX`"; then		
+			REGEX_LIB=regex/libregex.a
+			HSREGEX=yes
+			AC_MSG_RESULT(yes)
+			AC_DEFINE(HSREGEX)
+			AC_DEFINE(REGEX,1)
+		else
+			REGEX_LIB=
+			HSREGEX=no
+			AC_MSG_RESULT(no)
+			AC_DEFINE(REGEX,0)
+		fi
+	else
+		REGEX_LIB=regex/libregex.a
+		HSREGEX=yes
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HSREGEX)
+		AC_DEFINE(REGEX,1)
+	fi
+])
+AC_SUBST(REGEX_LIB)
+AC_SUBST(HSREGEX)
+
+AC_PREFERRED_DB_LIB
+
+if test "$DBM_LIB" = "-lgdbm"; then
+	AC_CHECK_HEADER(gdbm.h, [ GDBM_INCLUDE="" ], [ 
+		AC_MSG_RESULT("Try /usr/local/include/gdbm.h"); 
+		AC_CHECK_HEADER(/usr/local/include/gdbm.h, [ GDBM_INCLUDE="-I/usr/local/include" ],[
+			AC_MSG_RESULT("Try /opt/local/include/gdbm.h");
+			AC_CHECK_HEADER(/opt/local/include/gdbm.h, [ GDBM_INCLUDE="-I/opt/local/include" ],[
+				dnl if in /usr/pkg/include, don't add anything.  See above.
+				AC_MSG_RESULT("Try /usr/pkg/include/gdbm.h");
+				AC_CHECK_HEADER(/usr/pkg/include/gdbm.h, [ GDBM_INCLUDE="" ],[
+					AC_MSG_RESULT("Giving up - You need to install gdbm.h somewhere");
+					exit
+				])
+			])
+		])	
+	])
+	AC_DEFINE(HAVE_GDBM_H, 1)
+	AC_SUBST(GDBM_INCLUDE)
+fi
+
+AC_MSG_CHECKING(for mod_charset compatibility option)
+AC_ARG_WITH(mod_charset,
+[  --with-mod_charset      Enable transfer tables for mod_charset (Rus Apache).],
+[
+    if test "$withval" = "yes"; then
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(USE_TRANSFER_TABLES)
+    else
+	AC_MSG_RESULT(no)
+    fi
+],[
+	AC_MSG_RESULT(no)
+])
+
+AC_MSG_CHECKING(for fhttpd module support)
+AC_ARG_WITH(fhttpd,
+[  --with-fhttpd[=DIR]     Build fhttpd module.  DIR is the fhttpd sources
+                          directory, defaults to /usr/local/src/fhttpd.],
+[
+	if test "$withval" = "yes"; then
+	  # fhttpd source directory
+	  withval=/usr/local/src/fhttpd
+	fi
+	if test "$withval" != "no"; then
+# For fhttpd 0.3.x
+	  if test -f $withval/servproc.h; then 
+	    FHTTPD_INCLUDE=-I$withval/
+            FHTTPD_LIB=$withval/servproc.o
+	    FHTTPD_TARGET=$withval/
+	    BINNAME=php
+	    AC_DEFINE(FHTTPD)
+	    AC_MSG_RESULT(yes - fhttpd 0.3.x)
+	  else
+	    AC_MSG_RESULT(no)
+	    AC_MSG_ERROR(Invalid fhttpd directory - unable to find servproc.h under $withval)
+	  fi
+	else
+	  AC_MSG_RESULT(no)
+	fi
+],[
+	AC_MSG_RESULT(no)
+])
+AC_SUBST(FHTTPD_INCLUDE)
+AC_SUBST(FHTTPD_LIB)
+AC_SUBST(FHTTPD_TARGET)
+
+AC_MSG_CHECKING(for IMAP support)
+AC_ARG_WITH(imap,
+[  --with-imap[=DIR]       Include IMAP support (DIR is IMAP's include dir and c-client.a dir).],
+[
+    if test "$withval" = "yes"; then
+		if test -f /usr/local/include/mail.h; then
+			withval=/usr/local
+		elif test -f /usr/include/mail.h; then
+			withval=/usr
+		elif test -f /usr/include/imap/mail.h; then
+			withval=/usr
+		fi
+    fi
+	if test "$withval" != "no" && test "$withval" != "yes"; then
+		IMAP_DIR=$withval
+		if test -f $IMAP_DIR/include/imap/mail.h; then
+			IMAP_INC_DIR=$IMAP_DIR/include/imap
+		else
+			IMAP_INC_DIR=$withval/include
+		fi
+		
+        if test ! -f $IMAP_INC_DIR/mail.h; then
+			AC_MSG_ERROR(could not find mail.h in $IMAP_INC_DIR !)
+		fi
+		if test ! -f  $IMAP_INC_DIR/rfc822.h; then
+			AC_MSG_ERROR(could not find rfc822.h in $IMAP_INC_DIR !)
+		fi
+		if test ! -f $IMAP_INC_DIR/linkage.h; then
+			AC_MSG_ERROR(could not find linkage.h in $IMAP_INC_DIR !)
+		fi
+
+		AC_EXPAND_PATH($IMAP_DIR, IMAP_DIR)
+		if test -f "$IMAP_DIR/lib/libimap.a" ; then
+		  AC_ADD_LIBRARY_WITH_PATH(imap, $IMAP_DIR/lib)
+		elif test -f "$IMAP_DIR/lib/libc-client4.a" || test -f "$IMAP_DIR/lib/libc-client4.so"; then
+		  AC_ADD_LIBRARY_WITH_PATH(c-client4, $IMAP_DIR/lib)
+	    elif test -f "$IMAP_DIR/lib/libc-client.a" || test -f "$IMAP_DIR/lib/libc-client.so"; then
+		  AC_ADD_LIBRARY_WITH_PATH(c-client, $IMAP_DIR/lib)
+        elif test -f "$IMAP_DIR/lib/c-client.a" ; then
+          EXTRA_LIBS="$EXTRA_LIBS $IMAP_DIR/lib/c-client.a"
+		else
+		  AC_MSG_ERROR(Please copy or link $IMAP_DIR/lib/c-client.a to $IMAP_DIR/lib/libc-client.a)
+        fi
+		AC_ADD_INCLUDE($IMAP_INC_DIR)
+        AC_DEFINE(HAVE_IMAP)
+	    AC_MSG_RESULT(yes)
+	else
+	    AC_MSG_RESULT(no)
+	fi
+],[
+    AC_MSG_RESULT(no)
+])
+
+AC_MSG_CHECKING(for IMSP support)
+AC_ARG_WITH(imsp,
+[  --with-imsp[=DIR]       Include IMSp support (DIR is IMSP's include dir and libimsp.a dir).],
+[
+    if test "$withval" = "yes"; then
+		if test -f /usr/local/include/imsp.h; then
+			withval=/usr/local
+		elif test -f /usr/include/imsp.h; then
+			withval=/usr
+		elif test -f /usr/include/imsp/imsp.h; then
+			withval=/usr
+		fi
+    fi
+	if test "$withval" != "no"; then
+		IMSP_DIR=$withval
+		if test -f $IMSP_DIR/include/imsp/mail.h; then
+			IMSP_INC_DIR=$IMSP_DIR/include/imsp
+		else
+			IMSP_INC_DIR=$withval/include
+		fi
+		
+        if test ! -f $IMSP_INC_DIR/imsp.h; then
+			AC_MSG_ERROR(could not find imsp.h in $IMSP_INC_DIR !)
+		fi
+		if test ! -f  $IMSP_INC_DIR/support.h; then
+			AC_MSG_ERROR(could not find support.h in $IMSP_INC_DIR !)
+		fi
+		if test ! -f $IMSP_INC_DIR/imutil.h; then
+			AC_MSG_ERROR(could not find imutil.h in $IMSP_INC_DIR !)
+		fi
+
+		if test -f "$IMSP_DIR/lib/libimsp.a" ; then
+		  AC_ADD_LIBRARY_WITH_PATH(imsp, $IMSP_DIR/lib)
+        elif test -f "$IMSP_DIR/lib/imsp.a" ; then
+          EXTRA_LIBS="$EXTRA_LIBS $IMSP_DIR/lib/imsp.a"
+		else
+		  AC_MSG_ERROR(Please copy or link $IMSP_DIR/lib/imsp.a to $IMSP_DIR/lib/libimsp.a)
+        fi
+		AC_ADD_INCLUDE($IMSP_INC_DIR)
+        AC_DEFINE(HAVE_IMSP)
+	    AC_MSG_RESULT(yes)
+	else
+	    AC_MSG_RESULT(no)
+	fi
+],[
+    AC_MSG_RESULT(no)
+])
+
+
+AC_MSG_CHECKING(for ASPELL support)
+AC_ARG_WITH(aspell,
+[  --with-aspell[=DIR]     Include ASPELL support.],
+[
+  if test "$withval" != "no"; then
+    if test "$withval" = "yes"; then
+      ASPELL_DIR=/usr/local
+    else
+      ASPELL_DIR=$withval
+    fi
+    
+    AC_ADD_INCLUDE($ASPELL_DIR/include)
+    AC_ADD_LIBRARY_WITH_PATH(aspell, $ASPELL_DIR/lib)
+    
+    if test ! -f "$ASPELL_DIR/include/aspell-c.h"; then
+      AC_MSG_ERROR(Could not find aspell-c.h in $ASPELL_DIR/include - please copy it manually from the aspell sources to $ASPELL_DIR/include)
+    fi
+    AC_DEFINE(HAVE_ASPELL)
+    AC_MSG_RESULT(yes)
+  else
+    AC_MSG_ERROR(no)
+  fi
+],[
+  AC_MSG_RESULT(no)
+])
+
+AC_MSG_CHECKING(for MCAL support)
+AC_ARG_WITH(mcal,
+[  --with-mcal[=DIR]     Include MCAL support.],
+[
+  if test "$withval" != "no"; then
+    if test "$withval" = "yes"; then
+      MCAL_DIR=/usr/local
+    else
+      MCAL_DIR=$withval
+    fi
+    
+    AC_ADD_INCLUDE($MCAL_DIR/)
+    AC_ADD_LIBRARY_WITH_PATH(mcal, $MCAL_DIR/)
+    AC_DEFINE(HAVE_MCAL)
+    AC_MSG_RESULT(yes)
+  else
+    AC_MSG_ERROR(no)
+  fi
+],[
+  AC_MSG_RESULT(no)
+])
+
+AC_MSG_CHECKING(for ftp support)
+AC_ARG_WITH(ftp,
+[  --with-ftp     Include FTP support.],
+[
+  if test "$withval" != "no"; then
+    AC_DEFINE(HAVE_FTP)
+    AC_MSG_RESULT(yes)
+  else
+    AC_MSG_ERROR(no)
+  fi
+],[
+  AC_MSG_RESULT(no)
+])
+
+AC_ARG_WITH(gd,
+[  --without-gd            Disable GD support.
+  --with-gd[=DIR]         Include GD support (DIR is GD's install dir).],
+[
+  case "$withval" in
+    no)
+      AC_MSG_CHECKING(whether to include GD support)
+      AC_MSG_RESULT(no)
+      ;;
+    yes)
+      dnl Check for PNG-based GD version
+      old_LIBS=$LIBS
+      AC_CHECK_LIB(z,compress, LIBS="$LIBS -lz",,)
+      AC_CHECK_LIB(png,png_info_init, LIBS="$LIBS -lpng",,)
+      AC_CHECK_LIB(gd, gdImageCreateFromPng, [AC_DEFINE(HAVE_GD_PNG)])
+      LIBS=$old_LIBS
+      if test "$ac_cv_lib_gd_gdImageCreateFromPng" = "yes"; then
+        AC_ADD_LIBRARY(png)
+        AC_ADD_LIBRARY(z)
+      fi
+
+      old_LIBS=$LIBS
+      AC_MSG_CHECKING([for libjpeg (needed by gd-1.8+)])
+      AC_ARG_WITH(jpeg-dir,
+      [  --with-jpeg-dir[=DIR]   jpeg dir for gd-1.8+],[
+        AC_MSG_RESULT(yes)
+        if test -z $withval; then
+          withval="/usr/local"
+        fi
+        LIBS="$LIBS -L$withval/lib -ljpeg"
+        AC_CHECK_LIB(jpeg,jpeg_read_header, [LIBS="$LIBS -L$withval/lib -ljpeg"],,)
+      ],[
+        AC_MSG_RESULT(no)
+        AC_MSG_WARN(If configure fails try --with-jpeg-dir=<DIR>)
+      ]) 
+      withval=$old_withval
+      AC_CHECK_LIB(gd,gdImageCreateFromJpeg,[AC_DEFINE(HAVE_GD_JPG)])
+      LIBS=$old_LIBS
+      if test "$ac_cv_lib_gd_gdImageCreateFromJpeg" = "yes"; then
+        AC_ADD_LIBRARY(jpeg)
+      fi
+      
+      AC_CHECK_LIB(gd,gdImageCreateFromGif,[AC_DEFINE(HAVE_GD_GIF)])
+      AC_CHECK_LIB(gd,gdImageLzw,          [AC_DEFINE(HAVE_GD_LZW)])
+      AC_CHECK_LIB(gd,gdImageColorResolve, [AC_DEFINE(HAVE_GD_COLORRESOLVE)])
+      AC_CHECK_LIB(gd,gdImageString16,[ ], [AC_DEFINE(HAVE_GD_ANCIENT)])
+      
+      dnl Say hi to the NetBSD package system!
+      if test -f /usr/pkg/include/gd/gd.h -a -z "$GD_INCLUDE" ; then
+         AC_ADD_INCLUDE(/usr/pkg/include/gd)
+      fi
+
+      AC_MSG_CHECKING(whether to include GD support)
+      if test "$ac_cv_lib_gd_gdImageCreateFromPng" = "no" && 
+         test "$ac_cv_lib_gd_gdImageCreateFromGif" = "no"; then
+        AC_MSG_RESULT(no)
+      else
+        AC_ADD_LIBRARY(gd)
+        AC_DEFINE(HAVE_LIBGD)
+        PHP_HAVE_GD=yes
+        AC_MSG_RESULT(yes)
+      fi
+      ;;
+    *)
+      test -f $withval/include/gd1.7/gd.h && GD_INCLUDE="$withval/include/gd1.7"
+      test -f $withval/include/gd1.6/gd.h && GD_INCLUDE="$withval/include/gd1.6"
+      test -f $withval/include/gd1.5/gd.h && GD_INCLUDE="$withval/include/gd1.5"
+      test -f $withval/include/gd1.4/gd.h && GD_INCLUDE="$withval/include/gd1.4"
+      test -f $withval/include/gd1.3/gd.h && GD_INCLUDE="$withval/include/gd1.3"
+      test -f $withval/include/gd/gd.h && GD_INCLUDE="$withval/include/gd"
+      test -f $withval/include/gd.h && GD_INCLUDE="$withval/include"
+      test -f $withval/gd1.6/gd.h && GD_INCLUDE="$withval/gd1.6"
+      test -f $withval/gd1.5/gd.h && GD_INCLUDE="$withval/gd1.5"
+      test -f $withval/gd1.4/gd.h && GD_INCLUDE="$withval/gd1.4"
+      test -f $withval/gd1.3/gd.h && GD_INCLUDE="$withval/gd1.3"
+      test -f $withval/gd/gd.h && GD_INCLUDE="$withval/gd"
+      test -f $withval/gd.h && GD_INCLUDE="$withval"
+
+      test -f $withval/lib/libgd.a && GD_LIB="$withval/lib"
+      test -f $withval/lib/gd/libgd.a && GD_LIB="$withval/lib/gd"
+      test -f $withval/lib/gd1.7/libgd.a && GD_LIB="$withval/lib/gd1.7"
+      test -f $withval/lib/gd1.6/libgd.a && GD_LIB="$withval/lib/gd1.6"
+      test -f $withval/lib/gd1.5/libgd.a && GD_LIB="$withval/lib/gd1.5"
+      test -f $withval/lib/gd1.4/libgd.a && GD_LIB="$withval/lib/gd1.4"
+      test -f $withval/lib/gd1.3/libgd.a && GD_LIB="$withval/lib/gd1.3"
+      test -f $withval/libgd.a && GD_LIB="$withval"
+      test -f $withval/gd/libgd.a && GD_LIB="$withval/gd"
+      test -f $withval/gd1.7/libgd.a && GD_LIB="$withval/gd1.7"
+      test -f $withval/gd1.6/libgd.a && GD_LIB="$withval/gd1.6"
+      test -f $withval/gd1.5/libgd.a && GD_LIB="$withval/gd1.5"
+      test -f $withval/gd1.4/libgd.a && GD_LIB="$withval/gd1.4"
+      test -f $withval/gd1.3/libgd.a && GD_LIB="$withval/gd1.3"
+
+      if test -n "$GD_INCLUDE" && test -n "$GD_LIB" ; then
+        AC_ADD_INCLUDE($GD_INCLUDE)
+        AC_ADD_LIBRARY_WITH_PATH(gd, $GD_LIB)
+ 
+        old_LDFLAGS=$LDFLAGS
+        LDFLAGS="$LDFLAGS -L$GD_LIB"
+        
+        dnl Check for PNG-based GD version
+        old_LIBS=$LIBS
+        AC_CHECK_LIB(z,compress, LIBS="$LIBS -lz",,)
+        AC_CHECK_LIB(png,png_info_init, LIBS="$LIBS -lpng",,)
+        AC_CHECK_LIB(gd, gdImageCreateFromPng, [AC_DEFINE(HAVE_GD_PNG)])
+        AC_CHECK_LIB(gd,gdImageCreateFromJpeg,[AC_DEFINE(HAVE_GD_JPG)])
+        LIBS=$old_LIBS
+        if test "$ac_cv_lib_gd_gdImageCreateFromPng" = "yes"; then
+          AC_ADD_LIBRARY(png)
+          AC_ADD_LIBRARY(z)
+        fi
+        
+        AC_CHECK_LIB(gd,gdImageCreateFromGif,[AC_DEFINE(HAVE_GD_GIF)])
+        AC_CHECK_LIB(gd,gdImageLzw,          [AC_DEFINE(HAVE_GD_LZW)])
+        AC_CHECK_LIB(gd,gdImageColorResolve, [AC_DEFINE(HAVE_GD_COLORRESOLVE)])
+        AC_CHECK_LIB(gd,gdImageString16,[ ], [AC_DEFINE(HAVE_GD_ANCIENT)])
+            
+        LDFLAGS=$old_LDFLAGS;
+
+        AC_MSG_CHECKING(whether to include GD support)
+        if test "$ac_cv_lib_gd_gdImageCreateFromPng" = "no" &&
+           test "$ac_cv_lib_gd_gdImageCreateFromGif" = "no"; then
+          AC_MSG_RESULT(no)
+        else
+          AC_DEFINE(HAVE_LIBGD)
+          PHP_HAVE_GD=yes
+          AC_MSG_RESULT(yes)
+        fi
+      else
+        AC_MSG_CHECKING(whether to include GD support)
+        AC_MSG_RESULT(no)
+      fi
+      ;;
+  esac
+],[
+  AC_CHECK_LIB(gd, gdImageLine, [
+    AC_DEFINE(HAVE_LIBGD)
+    AC_ADD_LIBRARY(gd)
+  ])
+  
+  if test "$ac_cv_lib_gd_gdImageLine" = "yes"; then
+    dnl Check for PNG-based GD version
+    old_LIBS=$LIBS
+    AC_CHECK_LIB(z,compress, LIBS="$LIBS -lz",,)
+    AC_CHECK_LIB(png,png_info_init, LIBS="$LIBS -lpng",,)
+    AC_CHECK_LIB(gd, gdImageCreateFromPng, [AC_DEFINE(HAVE_GD_PNG)])
+    AC_CHECK_LIB(gd,gdImageCreateFromJpeg,[AC_DEFINE(HAVE_GD_JPG)])
+    LIBS=$old_LIBS
+    if test "$ac_cv_lib_gd_gdImageCreateFromPng" = "yes"; then
+      AC_ADD_LIBRARY(png)
+      AC_ADD_LIBRARY(z)
+    fi
+      
+    AC_CHECK_LIB(gd,gdImageCreateFromGif,[AC_DEFINE(HAVE_GD_GIF)])
+    AC_CHECK_LIB(gd,gdImageLzw,          [AC_DEFINE(HAVE_GD_LZW)])
+    AC_CHECK_LIB(gd,gdImageColorResolve, [AC_DEFINE(HAVE_GD_COLORRESOLVE)])
+    AC_CHECK_LIB(gd,gdImageString16,[ ], [AC_DEFINE(HAVE_GD_ANCIENT)])
+    
+    dnl Say hi to the NetBSD package system!
+    if test -f /usr/pkg/include/gd/gd.h -a -z "$GD_INCLUDE" ; then
+       AC_ADD_INCLUDE(/usr/pkg/include/gd)
+    fi
+
+    AC_MSG_CHECKING(whether to include GD support)
+    if test "$ac_cv_lib_gd_gdImageCreateFromPng" = "no" &&
+       test "$ac_cv_lib_gd_gdImageCreateFromGif" = "no"; then
+      AC_MSG_RESULT(no)
+    else
+      AC_DEFINE(HAVE_LIBGD)
+      PHP_HAVE_GD=yes
+      AC_MSG_RESULT(yes)
+    fi
+  else
+    AC_MSG_CHECKING(whether to include GD support)
+    AC_MSG_RESULT(no)
+  fi
+])
+
+AC_MSG_CHECKING(whether to include FreeType support)
+AC_ARG_WITH(ttf,
+[  --with-ttf[=DIR]        Include FreeType support],
+[
+  PHP_TTF=$withval
+],[
+  PHP_TTF=yes
+])
+AC_MSG_RESULT($PHP_TTF)
+
+define(PHP_ICHK,[
+test -f "$i/$1"; then $2_PREFIX="$i"; $2_INCLUDE="$i/$1";
+])
+
+define(PHP_LCHK,[
+test -f "$i/$1"; then $2_PREFIX="$i"; $2_LIBPATH="$i/$1";
+])
+
+define(PHP_TTF_LIB_CHECK,[
+    for i in lib lib/freetype ""; do
+      ac_save_ldflags="$LDFLAGS"
+      ac_save_libs="$LIBS"
+      LDFLAGS="$LDFLAGS -L$$1_PREFIX/$i"
+      unset ac_cv_lib_$2_TT_Init_FreeType
+      AC_CHECK_LIB($2, TT_Init_FreeType,[
+        LDFLAGS="$ac_save_ldflags"
+        LIBS="$ac_save_libs"
+        AC_ADD_LIBRARY_WITH_PATH($2, $$1_PREFIX/$i)
+        AC_DEFINE(HAVE_LIB$1)
+        dir=`dirname $$1_INCLUDE`
+        AC_ADD_INCLUDE($dir)
+        break
+      ])
+      LDFLAGS="$ac_save_ldflags"
+    done
+])
+
+if test "$PHP_TTF" != "no" && test "$PHP_HAVE_GD" != "yes"; then
+  AC_MSG_WARN(No gd support found. Skipping FreeType Configuration)
+elif test "$PHP_TTF" != "no"; then
+  for i in /usr/local /usr $PHP_TTF; do
+    if PHP_ICHK(freetype.h, TTF)
+    elif PHP_ICHK(include/freetype.h, TTF)
+    elif PHP_ICHK(include/freetype/freetype.h, TTF)
+    fi
+    
+    if PHP_ICHK(truetype.h, FREETYPE)
+    elif PHP_ICHK(include/truetype.h, FREETYPE)
+    elif PHP_ICHK(include/freetype/truetype.h, FREETYPE)
+    fi
+  done
+
+  if test -n "$FREETYPE_PREFIX"; then
+    PHP_TTF_LIB_CHECK(FREETYPE, freetype)
+  elif test -n "$TTF_PREFIX"; then
+    PHP_TTF_LIB_CHECK(TTF, ttf)
+  fi
+fi
+
+AC_ARG_ENABLE(t1lib,
+[  --enable-t1lib          Enable t1lib support.],[
+  if test "$enableval" = "yes"; then
+    AC_CHECK_LIB(t1, T1_SetDefaultEncoding, [ AC_DEFINE(HAVE_LIBT1) ], [
+      AC_MSG_ERROR(T1lib version 0.8 or higher required)
+    ])
+    AC_CHECK_LIB(t1, T1_GetCharOutline, [
+      AC_DEFINE(HAVE_LIBT1_OUTLINE)
+      T1LIB_WARNING="WARNING: You *must* read README.t1lib for a necessary patch"
+    ])
+    AC_CHECK_LIB(t1, T1_GetExtend, [ T1LIB_WARNING="" ])dnl New version, bug fixed
+    AC_ADD_LIBRARY(t1)
+    AC_MSG_CHECKING(whether to enable t1lib support)
+    AC_MSG_RESULT(yes)
+  else
+    AC_DEFINE(HAVE_LIBT1, 0)
+    AC_MSG_CHECKING(whether to enable t1lib support)
+    AC_MSG_RESULT(no)
+  fi
+],[
+  AC_DEFINE(HAVE_LIBT1, 0)
+  AC_MSG_CHECKING(whether to enable t1lib support)
+  AC_MSG_RESULT(no)
+])
+
+AC_MSG_CHECKING(whether to include GNU gettext support)
+AC_ARG_WITH(gettext,
+[  --with-gettext[=DIR]    Include GNU gettext support.  DIR is the gettext
+                          intall directory, defaults to /usr/local],
+[
+  if test "$withval" != "no"; then
+  	if test "$withval" = "yes"; then
+	   	GETTEXT_INCDIR=/usr/local/include
+   		test -f /usr/local/include/libintl.h && GETTEXT_INCDIR=/usr/local/include/
+   		GETTEXT_LIBDIR=/usr/local/lib
+   	else
+   		GETTEXT_INCDIR=$withval/include
+   		test -f $withval/include/libintl.h && GETTEXT_INCDIR=$withval/include
+   		GETTEXT_LIBDIR=$withval/lib
+   	fi
+    
+    AC_ADD_INCLUDE($GETTEXT_INCDIR)
+    AC_ADD_LIBPATH($GETTEXT_LIBDIR)
+    
+    GETTEXT_INCLUDE=-I$GETTEXT_INCDIR
+    GETTEXT_LFLAGS=-L$GETTEXT_LIBDIR
+	O_CPPFLAGS="$CPPFLAGS"
+	O_LDFLAGS=$LDFLAGS
+	CPPFLAGS="$CPPFLAGS -I$GETTEXT_INCDIR"
+	LDFLAGS="$LDFLAGS -L$GETTEXT_LIBDIR"
+	GETTEXT_LIBS=
+    AC_MSG_RESULT(yes)
+	AC_CHECK_LIB(intl, bindtextdomain, GETTEXT_LIBS="intl",[
+		AC_CHECK_LIB(c, bindtextdomain, GETTEXT_LIBS=,[
+			AC_MSG_ERROR(Unable to find required gettext library)
+		],)
+	],)
+    AC_ADD_LIBRARY($GETTEXT_LIBS)
+
+    AC_DEFINE(HAVE_LIBINTL)
+
+  else
+  	AC_MSG_RESULT(no)
+  fi
+],[
+  AC_MSG_RESULT(no)
+])
+
+AC_MSG_CHECKING(whether to include ImageMagick support)
+AC_ARG_WITH(imagick,
+[  --with-imagick[=DIR]    Include ImageMagick support.  DIR is the
+                          intall directory, and if left out, PHP will
+                          try to find it on its own. [experimental]],
+[
+  if test "$withval" != "no"; then
+  	if test "$withval" = "yes"; then
+	   	IMAGICK_INCDIR=/usr/X11R6/include/X11/magick
+   		IMAGICK_LIBDIR=/usr/X11R6/lib/
+   		test -f /usr/local/include/magick/magick.h && IMAGICK_INCDIR=/usr/local/include/magick
+		test -f /usr/local/lib/libMagick.a && IMAGICK_LIBDIR=/usr/local/lib
+   	else
+   		IMAGICK_INCDIR=$withval
+   		IMAGICK_LIBDIR=$withval
+   		test -f $withval/include/magick.h && IMAGICK_INCDIR=$withval/include
+   		test -f $withval/lib/libMagick.a && IMAGICK_LIBDIR=$withval/lib
+   		test -f $withval/include/magick/magick.h && IMAGICK_INCDIR=$withval/include/magick
+   		test -f $withval/lib/magick/libMagick.a && IMAGICK_LIBDIR=$withval/lib/magick
+   	fi
+	AC_MSG_RESULT(yes)
+	AC_PATH_X
+    AC_ADD_LIBPATH($IMAGICK_LIBDIR)
+    AC_ADD_LIBPATH(${ac_x_libraries})
+    AC_ADD_LIBRARY(Magick)
+    AC_ADD_LIBRARY(X11)
+    AC_ADD_INCLUDE($IMAGICK_INCDIR)
+    AC_ADD_INCLUDE(${ac_x_includes}/X11)
+	
+    O_CPPFLAGS="$CPPFLAGS"
+	O_LDFLAGS=$LDFLAGS
+	CPPFLAGS="$CPPFLAGS -I${ac_x_includes}/X11"
+	LDFLAGS="$LDFLAGS -L${ac_x_libraries}"
+dnl check for a whole whack of possible required libraries
+	AC_CHECK_LIB(bz2, bzBuffToBuffCompress, AC_ADD_LIBRARY(bz2),,)
+	AC_CHECK_LIB(Xext,XShapeCombineMask, AC_ADD_LIBRARY(Xext),,)
+	AC_CHECK_LIB(dps,DPSInitialize, AC_ADD_LIBRARY(dps),,) 
+	AC_CHECK_LIB(dpstk,XDPSPixelsPerPoint, AC_ADD_LIBRARY(dpstk),,)
+    AC_CHECK_LIB(tiff,TIFFOpen, AC_ADD_LIBRARY(tiff),,)
+    AC_CHECK_LIB(jpeg,jpeg_read_header, AC_ADD_LIBRARY(jpeg),,)
+	AC_CHECK_LIB(z,compress, AC_ADD_LIBRARY(z),,)
+	AC_CHECK_LIB(fpx,FPX_OpenImageByFilename, AC_ADD_LIBRARY(fpx),,)
+	AC_CHECK_LIB(png,png_info_init, AC_ADD_LIBRARY(png),,)
+	AC_CHECK_LIB(ttf,TT_Init_FreeType, AC_ADD_LIBRARY(ttf),,)
+	AC_CHECK_LIB(df,DFANputlabel, AC_ADD_LIBRARY(df),,)
+	AC_CHECK_LIB(jbig,jbg_dec_init, AC_ADD_LIBRARY(jbig),,)
+	
+	CPPFLAGS=$O_CPPFLAGS
+	LDFLAGS=$O_LDFLAGS
+	AC_DEFINE(HAVE_LIBMAGICK)
+
+  else
+	AC_MSG_RESULT(no)
+  fi
+],[
+  AC_MSG_RESULT(no)
+])
+
+AC_MSG_CHECKING(for Oracle support)
+AC_ARG_WITH(oracle,
+[  --with-oracle[=DIR]     Include Oracle database support.  DIR is Oracle's
+                          home directory, defaults to \$ORACLE_HOME.],
+[
+ case "$withval" in
+    yes)
+      ORACLEINST_TOP=$ORACLE_HOME
+      AC_MSG_RESULT(yes)
+      ;;
+    no)
+      ORACLEINST_TOP=
+      AC_MSG_RESULT(no)
+      ;;
+    *)
+      AC_MSG_RESULT(yes)
+      ORACLEINST_TOP=$withval
+      ;;
+  esac
+
+  if test "$ORACLEINST_TOP" != ""
+  then
+
+    # Oracle include files
+
+    if test -d "$ORACLEINST_TOP/rdbms/public"; then
+      ORACLE_INCLUDE="$ORACLE_INCLUDE -I$ORACLEINST_TOP/rdbms/public"
+	fi
+
+	if test -d "$ORACLEINST_TOP/rdbms/demo/";then
+      ORACLE_INCLUDE="$ORACLE_INCLUDE -I$ORACLEINST_TOP/rdbms/demo"
+    fi
+
+    if test -d "$ORACLEINST_TOP/network/public"; then
+      ORACLE_INCLUDE="$ORACLE_INCLUDE -I$ORACLEINST_TOP/network/public"
+    fi
+
+    if test -d "$ORACLEINST_TOP/plsql/public"; then
+      ORACLE_INCLUDE="$ORACLE_INCLUDE -I$ORACLEINST_TOP/plsql/public"
+    fi
+
+    # Need to know the version, otherwhise we will mixup nlsrtl
+    AC_ORACLE_VERSION($ORACLEINST_TOP)
+
+    # Oracle libs - nightmare :-)
+
+    ORACLE_LIBDIR=lib
+    AC_ADD_LIBPATH($ORACLEINST_TOP/$ORACLE_LIBDIR)
+    if test -f "$ORACLEINST_TOP/rdbms/lib/sysliblist"
+    then
+      ORA_SYSLIB="`cat $ORACLEINST_TOP/rdbms/lib/sysliblist`"
+    elif test -f "$ORACLEINST_TOP/lib/sysliblist"
+	then
+      ORA_SYSLIB="`cat $ORACLEINST_TOP/lib/sysliblist`"
+    else
+      ORA_SYSLIB="-lm"
+    fi
+
+    # Oracle Static libs
+    case $ORACLE_VERSION in
+      7.0|7.1)
+  	ORACLE_STLIBS="-locic $ORACLEINST_TOP/$ORACLE_LIBDIR/osntab.o \
+            -lsqlnet -lora -lsqlnet -lnlsrtl -lcv6 -lcore -lnlsrtl -lcv6 \
+            -lcore $ORA_SYSLIB -lcore $ORA_SYSLIB"
+    if test "`uname -s 2>/dev/null`" = "AIX"; then
+      ORACLE_STLIBS="$ORACLE_STLIBS -bI:$ORACLE_HOME/lib/mili.exp"
+    fi
+  	;;
+      7.2)
+  	ORACLE_STLIBS="-locic $ORACLEINST_TOP/$ORACLE_LIBDIR/osntab.o \
+            -lsqlnet -lora -lsqlnet -lora -lnlsrtl3 -lc3v6 -lcore3 -lnlsrtl3 \
+            -lcore3 $ORA_SYSLIB -lcore3 $ORA_SYSLIB"
+  	;;
+      7.3)
+  	ORACLE_STLIBS="-lclient -lsqlnet -lncr -lsqlnet -lclient -lcommon \
+  	    -lgeneric -lsqlnet -lncr -lsqlnet -lclient -lcommon -lgeneric \
+            -lepc -lnlsrtl3 -lc3v6 -lcore3 -lnlsrtl3 -lcore3 -lnlsrtl3 \
+            $ORA_SYSLIB -lcore3 $ORA_SYSLIB"
+  	;;
+      8.0)
+  	ORACLE_STLIBS="-lclient -lsqlnet -lncr -lsqlnet -lclient -lcommon \
+  	    -lgeneric -lsqlnet -lncr -lsqlnet -lclient -lcommon -lgeneric \
+            -lepc -lnlsrtl3 -lc3v6 -lcore4 -lnlsrtl3 -lcore4 -lnlsrtl3 \
+            $ORA_SYSLIB -lcore3 $ORA_SYSLIB"
+	;;
+      *)
+  	ORACLE_STLIBS=
+  	;;
+    esac
+  
+    # Oracle shared libs
+    case $ORACLE_VERSION in
+      7.0)
+  	# shared libs not supported
+  	ORACLE_SHLIBS="$ORACLE_STLIBS"
+  	;;
+      7.1)
+  	if test -f $ORACLEINST_TOP/$ORACLE_LIBDIR/liboracle.s?
+  	then
+  	  ORACLE_SHLIBS="-loracle $ORA_SYSLIB"
+  	else
+  	  ORACLE_SHLIBS="$ORACLE_STLIBS"
+  	fi
+  	;;
+      7.2|7.3)
+    	if test -f $ORACLEINST_TOP/$ORACLE_LIBDIR/libclntsh.s?
+    	then
+    	  ORACLE_SHLIBS="-lclntsh $ORA_SYSLIB"
+    	else
+    	  ORACLE_SHLIBS="$ORACLE_STLIBS"
+    	fi
+    	;;
+      8.0)
+	if test -f $ORACLEINST_TOP/$ORACLE_LIBDIR/libclntsh.s? -o \
+	        -f $ORACLEINST_TOP/$ORACLE_LIBDIR/libclntsh.a # AIX
+    	then
+	  if test "$CC" = "gcc" -a "`uname -sv`" = "AIX 4"; then
+	    # for Oracle 8 on AIX 4
+	    ORA_SYSLIB="$ORA_SYSLIB -nostdlib /lib/crt0_r.o /usr/lib/libpthreads.a /usr/lib/libc_r.a -lgcc"
+	  fi
+    	  ORACLE_SHLIBS="-lclntsh -lpsa -lcore4 -lnlsrtl3 -lclntsh $ORA_SYSLIB"
+    	else
+    	  ORACLE_SHLIBS="$ORACLE_STLIBS"
+    	fi
+        AC_DEFINE(HAVE_OCI8)
+    	;;
+      8.1)
+        ORACLE_SHLIBS="-lclntsh $ORA_SYSLIB"
+        AC_DEFINE(HAVE_OCI8)
+        ;;
+      *)
+  	ORACLE_SHLIBS=
+  	;;
+    esac
+  
+    # only using shared libs right now
+    ORACLE_LIBS=$ORACLE_SHLIBS
+
+    AC_DEFINE(HAVE_ORACLE)
+
+	  echo "+--------------------------------------------------------------------+"
+	  echo "| Notice:                                                            |"
+	  echo "| If you encounter <defunc> processes when using a local Oracle-DB   |"
+	  echo "| please recompile PHP and specify --enable-sigchild when configuring|"
+	  echo "| (This problem has been reported un Linux using Oracle >= 8.1.5)    |"
+	  echo "+--------------------------------------------------------------------+"
+
+  fi
+
+],[AC_MSG_RESULT(no)])
+AC_SUBST(ORACLE_SHLIBS)
+AC_SUBST(ORACLE_STLIBS)
+AC_SUBST(ORACLE_LIBS)
+AC_SUBST(ORACLE_LFLAGS)
+AC_SUBST(ORACLE_INCLUDE)
+AC_SUBST(ORACLE_HOME)
+AC_SUBST(ORACLE_VERSION)
+
+
+AC_MSG_CHECKING(for iODBC support)
+AC_ARG_WITH(iodbc,
+[  --with-iodbc[=DIR]      Include iODBC support.  DIR is the iODBC base
+                          install directory, defaults to /usr/local.],
+[
+	if test "$withval" = "yes"; then
+	  withval=/usr/local
+	fi
+	if test "$withval" != "no"; then
+
+	  IODBC_INCDIR=$withval/include
+	  IODBC_LIBDIR=$withval/lib
+	  IODBC_LFLAGS=-L$IODBC_LIBDIR
+	  IODBC_INCLUDE=-I$IODBC_INCDIR
+	  IODBC_LIBS=-liodbc
+      UODBC_DEFAULT=yes
+
+	  AC_DEFINE(HAVE_IODBC)
+
+	  AC_MSG_RESULT(yes)
+
+	fi
+],[
+	AC_MSG_RESULT(no)
+])
+AC_SUBST(IODBC_LIBS)
+AC_SUBST(IODBC_LFLAGS)
+AC_SUBST(IODBC_INCLUDE)
+
+
+AC_MSG_CHECKING(for OpenLink ODBC support)
+AC_ARG_WITH(openlink,
+[  --with-openlink[=DIR]   Include OpenLink ODBC support.  DIR is the
+                          OpenLink base install directory, defaults to
+                          /usr/local/openlink.],
+[
+	if test "$withval" = "yes"; then
+	  withval=/usr/local/openlink
+	fi
+	if test "$withval" != "no"; then
+
+	  OPENLINK_INCDIR=$withval/odbcsdk/include
+	  OPENLINK_LIBDIR=$withval/odbcsdk/lib
+	  OPENLINK_LFLAGS=-L$OPENLINK_LIBDIR
+	  OPENLINK_INCLUDE=-I$OPENLINK_INCDIR
+	  OPENLINK_LIBS=-liodbc
+      UODBC_DEFAULT=yes
+
+	  AC_DEFINE(HAVE_OPENLINK)
+
+	  AC_MSG_RESULT(yes)
+
+	fi
+],[
+	AC_MSG_RESULT(no)
+])
+AC_SUBST(OPENLINK_LIBS)
+AC_SUBST(OPENLINK_LFLAGS)
+AC_SUBST(OPENLINK_INCLUDE)
+
+
+AC_MSG_CHECKING(for Adabas support)
+AC_ARG_WITH(adabas,
+[  --with-adabas[=DIR]     Include Adabas D support.  DIR is the Adabas base
+                          install directory, defaults to /usr/local.],
+[
+  if test "$withval" = "yes"; then
+    withval=/usr/local
+  fi
+  if test "$withval" != "no"; then
+    ADA_INCDIR=$withval/incl
+    ADA_LIBDIR=$withval/lib
+    ADA_LFLAGS=-L$ADA_LIBDIR
+    ADA_INCLUDE=-I$ADA_INCDIR
+    ADA_LIBS="${ADA_LIBDIR}/odbclib.a -lsqlrte -lsqlptc"
+    UODBC_DEFAULT=yes
+
+    AC_DEFINE(HAVE_ADABAS)
+    AC_MSG_RESULT(yes)
+  else
+    AC_MSG_RESULT(no)
+  fi
+],[
+  AC_MSG_RESULT(no)
+])
+AC_SUBST(ADA_LIBS)
+AC_SUBST(ADA_LFLAGS)
+AC_SUBST(ADA_INCLUDE)
+
+
+AC_MSG_CHECKING(for Sybase support)
+AC_ARG_WITH(sybase,
+[  --with-sybase[=DIR]     Include Sybase-DB support.  DIR is the Sybase home
+                          directory, defaults to /home/sybase.],
+[
+  if test "$withval" != "no"; then
+  	if test "$withval" = "yes"; then
+		SYBASE_INCDIR=/home/sybase/include
+		SYBASE_LIBDIR=/home/sybase/lib
+   	else
+   		SYBASE_INCDIR=$withval/include
+   		SYBASE_LIBDIR=$withval/lib
+   	fi
+    SYBASE_INCLUDE=-I$SYBASE_INCDIR
+    SYBASE_LFLAGS="-L$SYBASE_LIBDIR -L$SYBASE_LIBDIR"
+    SYBASE_LIBS=-lsybdb
+    AC_MSG_RESULT(yes)
+    AC_CHECK_LIB(dnet_stub, dnet_addr,
+     [ SYBASE_LIBS="$SYBASE_LIBS -ldnet_stub"
+        AC_DEFINE(HAVE_LIBDNET_STUB)
+     ])
+    AC_DEFINE(HAVE_SYBASE)
+  else
+  	AC_MSG_RESULT(no)
+  fi
+],[
+  AC_MSG_RESULT(no)
+])
+AC_SUBST(SYBASE_LIBS)
+AC_SUBST(SYBASE_LFLAGS)
+AC_SUBST(SYBASE_INCLUDE)
+
+AC_MSG_CHECKING(for Sybase-CT support)
+AC_ARG_WITH(sybase-ct,
+[  --with-sybase-ct[=DIR]  Include Sybase-CT support.  DIR is the Sybase home
+                          directory, defaults to /home/sybase.],
+[
+  if test "$withval" != "no"; then
+    AC_MSG_RESULT(yes)
+    AC_DEFINE(HAVE_SYBASE_CT)
+  	if test "$withval" = "yes"; then
+		SYBASE_CT_INCDIR=/home/sybase/include
+		SYBASE_CT_LIBDIR=/home/sybase/lib
+   	else
+   		SYBASE_CT_INCDIR=$withval/include
+   		SYBASE_CT_LIBDIR=$withval/lib
+   	fi
+    SYBASE_CT_INCLUDE=-I$SYBASE_CT_INCDIR
+    SYBASE_CT_LFLAGS="-L$SYBASE_CT_LIBDIR"
+    SYBASE_CT_LIBS="-lcs -lct -lcomn -lintl"
+    old_LDFLAGS=$LDFLAGS
+    LDFLAGS="$LDFLAGS -L$SYBASE_CT_LIBDIR"
+    AC_CHECK_LIB(tcl, netg_errstr,
+              [ SYBASE_CT_LIBS="$SYBASE_CT_LIBS -ltcl" ],
+              [ SYBASE_CT_LIBS="$SYBASE_CT_LIBS -lsybtcl" ],
+              [ $SYBASE_CT_LIBS ])
+    AC_CHECK_LIB(insck, insck__getVdate,
+              [ SYBASE_CT_LIBS="$SYBASE_CT_LIBS -linsck" ])
+      LDFLAGS=$old_LDFLAGS
+  else
+  	AC_MSG_RESULT(no)
+  fi
+],[
+  AC_MSG_RESULT(no)
+])
+AC_SUBST(SYBASE_CT_LIBS)
+AC_SUBST(SYBASE_CT_LFLAGS)
+AC_SUBST(SYBASE_CT_INCLUDE)
+
+AC_MSG_CHECKING(for MySQL support)
+AC_ARG_WITH(mysql,
+[  --with-mysql[=DIR]      Include MySQL support.  DIR is the MySQL base
+                          install directory, defaults to searching through
+                          a number of common places for the MySQL files.],
+[
+  if test "$withval" != "no"; then
+    if test "$withval" = "yes"; then
+      # Autodetect
+      for w in /usr/include /usr/local/include /usr/mysql /usr/local/mysql /opt /opt/mysql; do
+        # check for plain setups
+        if test -f $w/mysql.h; then
+          MYSQL_INCDIR=$w
+          break
+        fi
+        # check for "/usr/include/<packagename>" type setups
+        if test -f $w/mysql/mysql.h; then
+          MYSQL_INCDIR=$w/mysql
+          break
+        fi
+        # check for "/usr/<packagename>/include" type setups
+        if test -f $w/mysql/include/mysql.h; then
+          MYSQL_INCDIR=$w/mysql/include
+          break
+        fi
+      done
+
+      for w in /usr/lib /usr/local/lib /usr/mysql /usr/local/mysql /opt /opt/mysql; do
+        # check for plain setups
+        if test -f $w/libmysqlclient.a -o -f $w/libmysqlclient.so; then
+          MYSQL_LIBDIR=$w
+          break
+        fi
+        # check for "/usr/lib/<packagename>" type setups
+        if test -f $w/mysql/libmysqlclient.a -o -f $w/mysql/libmysqlclient.so; then
+          MYSQL_LIBDIR=$w/mysql
+          break
+        fi
+        # check for "/usr/<packagename>/lib" type setups
+        if test -f $w/mysql/lib/libmysqlclient.a -o -f $w/mysql/lib/libmysqlclient.so; then
+          MYSQL_LIBDIR=$w/mysql/lib
+          break
+        fi
+      done
+    else
+      # Manual detection for <withval>/include/<packagename>
+      # and <withval>/include.
+      if test -f $withval/include/mysql/mysql.h; then
+        MYSQL_INCDIR=$withval/include/mysql
+      elif test -f $withval/include/mysql.h; then
+        MYSQL_INCDIR=$withval/include
+      fi
+      
+      # Manual detection for <withval>/lib/<packagename>
+      # and <withval>/lib.
+      if test -f $withval/lib/mysql/libmysqlclient.a -o -f $withval/lib/mysql/libmysqlclient.so; then
+        MYSQL_LIBDIR=$withval/lib/mysql
+      elif test -f $withval/lib/libmysqlclient.a -o -f $withval/lib/libmysqlclient.so; then
+        MYSQL_LIBDIR=$withval/lib
+      fi
+    fi
+    
+    ## Did we find anything?
+    if test -z "$MYSQL_LIBDIR" ; then
+      AC_MSG_RESULT(no)
+      AC_MSG_ERROR(Invalid MySQL directory - unable to find libmysqlclient.a or libmysqlclient.so.)
+    fi
+    if test -z "$MYSQL_INCDIR" ; then
+      AC_MSG_RESULT(no)
+      AC_MSG_ERROR(Invalid MySQL directory - unable to find mysql.h.)
+    fi
+
+    AC_ADD_LIBRARY_WITH_PATH(mysqlclient, $MYSQL_LIBDIR)
+    AC_ADD_INCLUDE($MYSQL_INCDIR)
+
+    AC_DEFINE(HAVE_MYSQL)
+    AC_MSG_RESULT(yes)
+
+    dnl check for errmsg.h, which isn't installed by some versions of 3.21
+    old_CPPFLAGS="$CPPFLAGS"
+    CPPFLAGS="$CPPFLAGS -I$MYSQL_INCDIR"
+    AC_CHECK_HEADERS(errmsg.h mysql.h)
+    CPPFLAGS="$old_CPPFLAGS"
+  else
+  	AC_MSG_RESULT(no)
+  fi
+],[
+  AC_MSG_RESULT(no)
+])
+
+AC_MSG_CHECKING(for mSQL support)
+AC_ARG_WITH(msql,
+[  --with-msql[=DIR]       Include mSQL support.  DIR is the mSQL base
+                          install directory, defaults to /usr/local/Hughes.],
+[
+  if test "$withval" != "no"; then
+  	if test "$withval" = "yes"; then
+      MSQL_INCDIR=/usr/local/Hughes/include
+      MSQL_LIBDIR=/usr/local/Hughes/lib
+   	else
+      MSQL_INCDIR=$withval/include
+      MSQL_LIBDIR=$withval/lib
+   	fi
+    AC_ADD_LIBRARY_WITH_PATH(msql, $MSQL_LIBDIR)
+    AC_ADD_INCLUDE($MSQL_INCDIR)
+
+    AC_DEFINE(HAVE_MSQL)
+    AC_MSG_RESULT(yes)
+    AC_MSQL_VERSION
+  else
+  	AC_MSG_RESULT(no)
+  fi
+],[
+  AC_MSG_RESULT(no)
+])
+
+AC_MSG_CHECKING(for PostgresSQL support)
+AC_ARG_WITH(pgsql,
+[  --with-pgsql[=DIR]      Include PostgresSQL support.  DIR is the PostgresSQL
+                          base install directory, defaults to /usr/local/pgsql.],
+[
+  if test "$withval" != "no"; then
+    if test "$withval" = "yes"; then
+	withval=/usr/local
+
+    fi
+
+    PGSQL_INCDIR=$withval/include
+    test -d $withval/include/pgsql && PGSQL_INCDIR=$withval/include/pgsql
+    test -d $withval/pgsql/include && PGSQL_INCDIR=$withval/pgsql/include
+    test -d $withval/include/postgresql && PGSQL_INCDIR=$withval/include/postgresql
+    PGSQL_LIBDIR=$withval/lib
+    test -d $withval/lib/pgsql && PGSQL_LIBDIR=$withval/lib/pgsql
+    test -d $withval/pgsql/lib && PGSQL_LIBDIR=$withval/pgsql/lib
+    test -d $withval/lib/postgresql && PGSQL_LIBDIR=$withval/lib/postgresql
+
+    PGSQL_INCLUDE=-I$PGSQL_INCDIR
+    PGSQL_LFLAGS=-L$PGSQL_LIBDIR
+    PGSQL_LIBS=-lpq
+    AC_ADD_LIBRARY_WITH_PATH(pq, $PGSQL_LIBDIR)
+    AC_ADD_INCLUDE($PGSQL_INCDIR)
+
+    old_CFLAGS=$CFLAGS; old_LDFLAGS=$LDFLAGS; old_LIBS=$LIBS
+    CFLAGS="$CFLAGS $PGSQL_INCLUDE"
+    LDFLAGS="$LDFLAGS $PGSQL_LFLAGS"
+    LIBS="$LIBS $PGSQL_LIBS"
+    AC_DEFINE(HAVE_PGSQL)
+    AC_MSG_RESULT(yes)
+    AC_CHECK_FUNC(PQcmdTuples,AC_DEFINE(HAVE_PQCMDTUPLES))
+    CFLAGS=$old_CFLAGS; LDFLAGS=$old_LDFLAGS; LIBS=$old_LIBS
+  else
+    AC_MSG_RESULT(no)
+  fi
+],[
+  AC_MSG_RESULT(no)
+])
+
+AC_MSG_CHECKING(for IBM DB2 support)
+AC_ARG_WITH(ibm-db2,
+[  --with-ibm-db2[=DIR]    Include IBM DB2 support.  DIR is the DB2 base
+                          install directory, defaults to /home/db2inst1/sqllib],
+[
+  if test "$withval" != "no"; then
+  	if test "$withval" = "yes"; then
+	    IBMDB2_INCDIR=/home/db2inst1/sqllib/include
+   		IBMDB2_LIBDIR=/home/db2inst1/sqllib/lib
+   	else
+   		IBMDB2_INCDIR=$withval/include
+   		IBMDB2_LIBDIR=$withval/lib
+   	fi
+    IBMDB2_INCLUDE=-I$IBMDB2_INCDIR
+    UODBC_DEFAULT=yes
+    AC_ADD_LIBRARY_WITH_PATH(db2, $IBMDB2_LIBDIR)
+    AC_ADD_INCLUDE($IBMDB2_INCDIR)
+
+    AC_DEFINE(HAVE_IBMDB2)
+
+    AC_MSG_RESULT(yes)
+  else
+  	AC_MSG_RESULT(no)
+  fi
+],[
+  AC_MSG_RESULT(no)
+])
+
+AC_MSG_CHECKING(for Solid support)
+AC_ARG_WITH(solid,
+[  --with-solid[=DIR]      Include Solid support.  DIR is the Solid base
+                          install directory, defaults to /usr/local/solid],
+[
+  if test "$withval" != "no"; then
+  	if test "$withval" = "yes"; then
+	    SOLID_INCDIR=/usr/local/solid/include
+   		SOLID_LIBDIR=/usr/local/solid/lib
+   	else
+   		SOLID_INCDIR=$withval/include
+   		SOLID_LIBDIR=$withval/lib
+   	fi
+    SOLID_INCLUDE=-I$SOLID_INCDIR
+    UODBC_DEFAULT=yes
+
+    AC_DEFINE(HAVE_SOLID)
+
+    AC_MSG_RESULT(yes)
+  else
+  	AC_MSG_RESULT(no)
+  fi
+],[
+  AC_MSG_RESULT(no)
+])
+if test "$SOLID_LIBDIR" != ""; then
+  AC_FIND_SOLID_LIBS($SOLID_LIBDIR)
+fi
+AC_SUBST(SOLID_INCLUDE)
+AC_SUBST(SOLID_LIBS)
+
+
+AC_MSG_CHECKING(for Empress support)
+AC_ARG_WITH(empress,
+[  --with-empress[=DIR]    Include Empress support.  DIR is the Empress base
+                          install directory, defaults to \$EMPRESSPATH],
+[
+  if test "$withval" != "no"; then
+        if test "$withval" = "yes"; then
+                EMPRESS_INCDIR=$EMPRESSPATH/odbccl/include
+                EMPRESS_LIBDIR=$EMPRESSPATH/odbccl/lib
+        else
+                EMPRESS_INCDIR=$withval/include
+                EMPRESS_LIBDIR=$withval/lib
+        fi
+    EMPRESS_INCLUDE=-I$EMPRESS_INCDIR
+    UODBC_DEFAULT=yes
+
+    AC_DEFINE(HAVE_EMPRESS)
+
+    AC_MSG_RESULT(yes)
+  else
+        AC_MSG_RESULT(no)
+  fi
+],[
+  AC_MSG_RESULT(no)
+])
+if test "$EMPRESS_LIBDIR" != ""; then
+  AC_FIND_EMPRESS_LIBS($EMPRESS_LIBDIR)
+fi
+AC_SUBST(EMPRESS_INCLUDE)
+AC_SUBST(EMPRESS_LIBS)
+
+
+AC_MSG_CHECKING(for LDAP support)
+AC_ARG_WITH(ldap,
+[  --with-ldap[=DIR]       Include LDAP support.  DIR is the LDAP base
+                          install directory, defaults to /usr and /usr/local],
+[
+  if test "$withval" != "no"; then
+  	if test "$withval" = "yes"; then
+		if test -f /usr/include/ldap.h; then
+			LDAP_INCDIR=/usr/include
+			LDAP_LIBDIR=/usr/lib
+		elif test -f /usr/local/include/ldap.h; then
+			LDAP_INCDIR=/usr/local/include
+			LDAP_LIBDIR=/usr/local/lib
+		else
+    		AC_MSG_RESULT(no)
+    		AC_MSG_ERROR(Unable to find ldap.h)
+		fi
+   	else
+		if test -f $withval/include/ldap.h; then
+			LDAP_INCDIR=$withval/include
+			LDAP_LIBDIR=$withval/lib
+		else
+    		AC_MSG_RESULT(no)
+    		AC_MSG_ERROR(Unable to find $withval/include/ldap.h)
+		fi
+   	fi
+
+dnl The Linux version of the SDK need -lpthread
+dnl I have tested Solaris, and it doesn't, but others may.  Add
+dnl these here if necessary.   -RL
+
+	if test `uname` = "Linux"; then
+		LDAP_PTHREAD="pthread"
+	else
+		LDAP_PTHREAD=
+	fi
+
+	if test -f $LDAP_LIBDIR/liblber.a; then
+        AC_ADD_LIBRARY(ldap)
+        AC_ADD_LIBRARY(lber)
+	elif test -f $LDAP_LIBDIR/libldapssl30.so; then
+        AC_ADD_LIBRARY(ldapssl30)
+        AC_ADD_LIBRARY($LDAP_PTHREAD)
+		AC_DEFINE(HAVE_NSLDAP)
+	elif test -f $LDAP_LIBDIR/libldapssl30.sl; then
+		AC_ADD_LIBRARY(ldapssl30)
+		AC_DEFINE(HAVE_NSLDAP)
+	elif test -f $LDAP_LIBDIR/libldap30.so; then
+		AC_ADD_LIBRARY(ldap30)
+        AC_ADD_LIBRARY($LDAP_PTHREAD)
+		AC_DEFINE(HAVE_NSLDAP)
+	elif test -f $LDAP_LIBDIR/libldap30.sl; then
+        AC_ADD_LIBRARY(ldap30)
+		AC_DEFINE(HAVE_NSLDAP)
+	fi
+
+    AC_ADD_LIBPATH($LDAP_LIBDIR)
+    AC_ADD_INCLUDE($LDAP_INCDIR)
+
+    AC_DEFINE(HAVE_LDAP)
+
+    AC_MSG_RESULT(yes)
+  else
+  	AC_MSG_RESULT(no)
+  fi
+],[
+  AC_MSG_RESULT(no)
+])
+
+AC_MSG_CHECKING(for Cybercash MCK support)
+AC_ARG_WITH(mck,
+[  --with-mck[=DIR]        Include Cybercash MCK support. DIR is the cybercash
+                          mck build directory, defaults to
+                          /usr/src/mck-3.2.0.3-linux for help look in
+                          extra/cyberlib],
+[
+  if test "$withval" != "no"; then
+       if test "$withval" = "yes"; then
+          MCK_INCDIR=/usr/src/mck-3.2.0.3-linux/c-api
+          MCK_LIBDIR=/usr/src/mck-3.2.0.3-linux/c-api/lib
+       else
+          MCK_INCDIR=$withval/c-api
+          MCK_LIBDIR=$withval/c-api/lib
+       fi
+    AC_ADD_LIBRARY_WITH_PATH(mckcrypto, $MCK_LIBDIR)
+    AC_ADD_INCLUDE($MCK_INCDIR)
+
+    AC_DEFINE(HAVE_MCK)
+
+    AC_MSG_RESULT(yes)
+  else
+    AC_MSG_RESULT(no)
+  fi
+],[
+  AC_MSG_RESULT(no)
+])
+AC_SUBST(MCK_LIBS)
+AC_SUBST(MCK_LFLAGS)
+AC_SUBST(MCK_INCLUDE)
+
+sinclude(snmp.m4)
+
+AC_MSG_CHECKING(for Velocis support)
+AC_ARG_WITH(velocis,
+[  --with-velocis[=DIR]    Include Velocis support.  DIR is the Velocis
+			  base install directory, defaults to /usr/local/velocis.],
+[
+  if test "$withval" != "no"; then
+    VELOCIS_OS=`uname`
+  	if test "$withval" = "yes"; then
+	    VELOCIS_INCDIR=/usr/local/velocis/include
+		VELOCIS_LIBDIR=/usr/local/velocis
+   	else
+		VELOCIS_INCDIR=$withval/include
+		VELOCIS_LIBDIR=$withval
+   	fi
+    VELOCIS_INCLUDE=-I$VELOCIS_INCDIR
+    VELOCIS_LIBDIR="$VELOCIS_LIBDIR/bin"
+    VELOCIS_LIBS="-l_rdbc -l_sql"
+    if test $VELOCIS_OS = "FreeBSD"; then
+	VELOCIS_LIBS="$VELOCIS_LIBDIR/../lib/rdscli.a -lcompat"
+    fi
+    if test $VELOCIS_OS = "BSD/OS"; then
+	VELOCIS_LIBS="$VELOCIS_LIBDIR/../lib/rdscli.a -lcompat"
+    fi
+    old_CFLAGS=$CFLAGS; old_LDFLAGS=$LDFLAGS
+	CFLAGS="$CFLAGS $VELOCIS_INCLUDE"
+	LDFLAGS="$LDFLAGS $VELOCIS_LIBS"
+    UODBC_DEFAULT=yes
+
+    AC_DEFINE(HAVE_VELOCIS)
+    AC_MSG_RESULT(yes)
+  else
+  	AC_MSG_RESULT(no)
+  fi
+],[
+  AC_MSG_RESULT(no)
+])
+AC_SUBST(VELOCIS_LIBS)
+AC_SUBST(VELOCIS_LFLAGS)
+AC_SUBST(VELOCIS_INCLUDE)
+
+AC_MSG_CHECKING(for Informix support)
+AC_ARG_WITH(informix,
+[  --with-informix[=DIR]   Include Informix support.  DIR is the Informix base
+                          install directory, defaults to ${INFORMIXDIR:-nothing}.],
+[
+	if test "$withval" != "no"; then
+		if test "$INFORMIXDIR" = ""; then
+			INFORMIX_WARNING="
+WARNING: You asked for Informix support, but don't have \\\$INFORMIXDIR
+	 environment value set up. Configuring and compiling Informix
+	 support to PHP3 is impossible and has been turned off. Please
+	 try again after setting up your environment."
+			IFX_C_MAKE='touch functions/ifx.c'
+			AC_MSG_RESULT(no)
+		else
+			if test "$withval" = "yes"; then
+				IFX_INCDIR=$INFORMIXDIR/incl/esql
+				IFX_LIBDIR="-L$INFORMIXDIR/lib -L$INFORMIXDIR/lib/esql"
+			else
+				IFX_INCDIR=$withval/incl/esql
+				IFX_LIBDIR="-L$withval/lib -L$withval/lib/esql"
+				if test "$withval" != "$INFORMIXDIR"; then
+					INFORMIX_WARNING="
+WARNING: You specified Informix base install directory that is different
+	 than your \\\$INFORMIXDIR environment variable. You'd better know
+	 exactly what you are doing."
+				fi
+    		fi
+			IFX_INCLUDE=-I$IFX_INCDIR
+			IFX_LFLAGS=$IFX_LIBDIR
+			if test -z "$IFX_LIBS"; then
+				IFX_LIBS=`esql -libs | sed -e 's/-lm$//'`
+				dnl  -lm twice otherwise?
+				IFX_LIBS=`echo $IFX_LIBS | sed -e 's/Libraries to be used://g' -e 's/esql: error -55923: No source or object file\.//g'`
+				dnl Seems to get rid of newlines.
+				dnl According to Perl's DBD-Informix, might contain these strings.
+			else
+				dnl Allow override to use static and/or threaded libs
+				IFX_LIBS="$IFX_LIBS"
+			fi
+			CFLAGS="$CFLAGS $IFX_INCLUDE"
+			LDFLAGS="$LDFLAGS $IFX_LFLAGS"
+
+		    if test "`uname -s 2>/dev/null`" = "AIX"; then
+				CFLAGS="$CFLAGS -D__H_LOCALEDEF"
+			fi
+			AC_DEFINE(HAVE_IFX)
+			AC_MSG_CHECKING([Informix version])
+			IFX_VERSION=[`esql -V | sed -ne '1 s/^[^0-9]*\([0-9]\)\.\([0-9]*\).*/\1\2/p'`]
+			if test $IFX_VERSION -ge "900"; then
+				AC_DEFINE(HAVE_IFX_IUS)
+				IFX_ESQL_FLAGS="-EDHAVE_IFX_IUS"
+			else
+				IFX_ESQL_FLAGS="-EUHAVE_IFX_IUS"
+			fi
+			AC_SUBST(IFX_ESQL_FLAGS)
+			AC_DEFINE_UNQUOTED(IFX_VERSION, $IFX_VERSION)
+			AC_MSG_RESULT(yes)
+		IFX_C_MAKE="(esql -e $IFX_ESQL_FLAGS functions/ifx.ec; mv ifx.c functions)"
+		fi
+	else
+		INFORMIXDIR=
+		IFX_C_MAKE='touch functions/ifx.c'
+		AC_MSG_RESULT(no)
+	fi
+],[
+  IFX_C_MAKE='touch functions/ifx.c'
+  AC_MSG_RESULT(no)
+])
+AC_SUBST(IFX_LIBS)
+AC_SUBST(IFX_LFLAGS)
+AC_SUBST(IFX_INCLUDE)
+AC_SUBST(INFORMIXDIR)
+AC_SUBST(IFX_C_MAKE)
+
+AC_MSG_CHECKING(for InterBase support)
+AC_ARG_WITH(interbase,
+[  --with-interbase[=DIR]  Include InterBase support.  DIR is the InterBase base
+                          install directory, defaults to /usr/interbase],
+[
+  if test "$withval" != "no"; then
+  	if test "$withval" = "yes"; then
+	   	IBASE_INCDIR=/usr/interbase/include
+   		IBASE_LIBDIR=/usr/interbase/lib
+   	else
+   		IBASE_INCDIR=$withval/include
+   		IBASE_LIBDIR=$withval/lib
+   	fi
+    IBASE_INCLUDE=-I$IBASE_INCDIR
+    IBASE_LFLAGS=-L$IBASE_LIBDIR
+    IBASE_LIBS="-lgds"
+
+    AC_DEFINE(HAVE_IBASE)
+
+    AC_MSG_RESULT(yes)
+  else
+  	AC_MSG_RESULT(no)
+  fi
+],[
+  AC_MSG_RESULT(no)
+])
+AC_SUBST(IBASE_INCLUDE)
+AC_SUBST(IBASE_LIBS)
+AC_SUBST(IBASE_LFLAGS)
+
+AC_MSG_CHECKING(for a custom ODBC support)
+AC_ARG_WITH(custom-odbc,
+[  --with-custom-odbc[=DIR]      Include a user defined ODBC support.
+                          The DIR is ODBC install base directory, 
+                          which defaults to /usr/local.
+                          Make sure to define CUSTOM_ODBC_LIBS and
+                          have some odbc.h in your include dirs.
+                          E.g., you should define following for 
+                          Sybase SQL Anywhere 5.5.00 on QNX, prior to
+                          run configure script:
+                              CFLAGS=\"-DODBC_QNX -DSQLANY_BUG\"
+                              LDFLAGS=-lunix
+                              CUSTOM_ODBC_LIBS=\"-ldblib -lodbc\".],
+[
+	if test "$withval" = "yes"; then
+	  withval=/usr/local
+	fi
+	if test "$withval" != "no"; then
+
+	  CODBC_INCDIR=$withval/include
+	  CODBC_LIBDIR=$withval/lib
+	  CODBC_LFLAGS=-L$CODBC_LIBDIR
+	  CODBC_INCLUDE=-I$CODBC_INCDIR
+	  CODBC_LIBS=$CUSTOM_ODBC_LIBS
+      UODBC_DEFAULT=yes
+
+	  AC_DEFINE(HAVE_CODBC)
+
+	  AC_MSG_RESULT(yes)
+
+	fi
+],[
+	AC_MSG_RESULT(no)
+])
+AC_SUBST(CODBC_LIBS)
+AC_SUBST(CODBC_LFLAGS)
+AC_SUBST(CODBC_INCLUDE)
+
+
+AC_MSG_CHECKING(for Hyperwave support)
+AC_ARG_WITH(hyperwave,
+[  --with-hyperwave        Include Hyperwave support],
+[
+  if test "$withval" != "no"; then
+    AC_DEFINE(HYPERWAVE,1)
+    AC_MSG_RESULT(yes)
+  else
+    AC_DEFINE(HYPERWAVE,0)
+    AC_MSG_RESULT(no)
+  fi
+],[
+  AC_DEFINE(HYPERWAVE,0)
+  AC_MSG_RESULT(no)
+])
+
+AC_MSG_CHECKING(for XML support)
+AC_ARG_WITH(xml,
+[  --with-xml              Include XML support],[
+  if test "$withval" != "no" ; then
+    for i in $withval /usr /usr/local; do
+      if test -f "$i/include/xml/xmltok.h" ; then
+        XML_DIR=$i
+        XML_INCLUDE="$i/include"
+        XML_LIB="$i/lib"
+      fi
+    done
+    if test "$XML_DIR" = "" ; then
+      if test -n "$APACHE_WITHVAL"; then
+        if test -f "$APACHE_WITHVAL/src/lib/expat-lite/xmltok.h"; then
+          XML_DIR=$APACHE_WITHVAL
+          XML_INCLUDE="$APACHE_WITHVAL/src/lib/expat-lite"
+          AC_DEFINE(RAW_XML_INCLUDEPATH)
+        fi
+      fi
+    fi
+    if test -n "$APXS"; then
+        i="`$APXS -q INCLUDEDIR`"
+        if test -f "$i/xml/xmltok.h"; then
+            XML_DIR=$i
+            XML_INCLUDE=$i
+        fi
+    fi
+    if test "$XML_DIR" = "" ; then
+      AC_MSG_ERROR(cannot find XML include files)
+    fi
+
+    AC_DEFINE(HAVE_LIBEXPAT, 1)
+    AC_MSG_RESULT(yes)
+    if test "$XML_LIB" != ""; then
+        AC_ADD_LIBRARY_WITH_PATH(expat, $XML_LIB)
+    fi
+    AC_ADD_INCLUDE($XML_INCLUDE)
+  else
+    AC_MSG_RESULT(no)
+  fi
+],[
+  AC_MSG_RESULT(no)
+]) 
+
+AC_MSG_CHECKING(whether to include YP support)
+AC_ARG_WITH(yp,
+[  --with-yp          Include YP support],
+[
+	if test "$withval" = "yes"; then
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_YP)
+		if test `uname` = "SunOS";then
+			release=`uname -r`
+			case "$release" in
+				5*)
+					AC_DEFINE(SOLARIS_YP)
+					;;
+				*)
+					;;
+			esac
+		fi
+	else
+		AC_MSG_RESULT(no)
+	fi
+],[
+	AC_MSG_RESULT(no)
+])
+
+AC_MSG_CHECKING(whether to include zlib support)
+AC_ARG_WITH(zlib,
+[  --with-zlib[=DIR]       Include zlib support (requires zlib >= 1.0.9).
+                          DIR is the zlib install directory,
+                          defaults to /usr.],
+[
+  case "$withval" in
+    no)
+      AC_MSG_RESULT(no) ;;
+    yes)
+      AC_MSG_RESULT(yes)
+      AC_CHECK_LIB(z, gzgets, [AC_DEFINE(HAVE_ZLIB) ZLIB_LIBS="-lz"],
+        [AC_MSG_ERROR(Zlib module requires zlib >= 1.0.9.)]) ;;
+    *)
+      test -f $withval/include/zlib/zlib.h && ZLIB_INCLUDE="-I$withval/include/zlib"
+      test -f $withval/include/zlib.h && ZLIB_INCLUDE="-I$withval/include"
+      if test -n "$ZLIB_INCLUDE" ; then
+        AC_MSG_RESULT(yes)
+        old_LIBS=$LIBS
+        LIBS="$LIBS -L$withval/lib"
+        AC_CHECK_LIB(z, gzgets, [AC_DEFINE(HAVE_ZLIB) ZLIB_LIBS="-L$withval/lib -lz"],
+          [AC_MSG_ERROR(Zlib module requires zlib >= 1.0.9.)])
+        LIBS=$old_LIBS
+      else
+        AC_MSG_RESULT(no)
+      fi ;;
+  esac
+],[
+  AC_MSG_RESULT(no)
+])
+AC_SUBST(ZLIB_LIBS)
+AC_SUBST(ZLIB_INCLUDE)
+
+
+AC_MSG_CHECKING(whether to include pdflib support)
+AC_ARG_WITH(pdflib,
+[  --with-pdflib[=DIR]     Include pdflib support (tested with 0.6 and 2.0).
+                          DIR is the pdflib install directory,
+                          defaults to /usr/local.],
+[
+  case "$withval" in
+    no)
+      AC_MSG_RESULT(no) ;;
+    yes)
+      LIBS="$LIBS -L/usr/local/lib $ZLIB_LIBS -ltiff -lz"
+      AC_MSG_RESULT(yes)
+      AC_MSG_WARN(!!!!! Note for pdflib 0.6 !!!!!)
+      AC_MSG_WARN(In order to ensure the pdf module works correctly, you must)
+      AC_MSG_WARN(modify the pdflib distribution. Take out line 190 in)
+      AC_MSG_WARN(file p_basic.c which closes the pdf file. Read the php3)
+      AC_MSG_WARN(documentation for more information.)
+      AC_CHECK_LIB(pdf, PDF_close, [AC_DEFINE(HAVE_PDFLIB) PDFLIB_LIBS="-L/usr/local/lib -lpdf" PDFLIB_INCLUDE="-I/usr/local/include"],
+        [AC_MSG_ERROR(pdflib module requires at least pdflib 0.6)])
+      AC_CHECK_LIB(pdf, PDF_new, [AC_DEFINE(HAVE_PDFLIB2) PDFLIB_LIBS="-L/usr/local/lib $ZLIB_LIBS -lpdf -ltiff -lz" PDFLIB_INCLUDE="-I/usr/local/include"],
+        [AC_MSG_WARN(No pdflib 2.0 support. Consider an update.)])
+      LIBS=$old_LIBS;;
+    *)
+      test -d $withval/include && PDFLIB_INCLUDE="-I$withval/include"
+      if test -f $withval/include/pdf.h ; then
+        AC_MSG_RESULT(yes)
+        AC_MSG_WARN(!!!!! Note for pdflib 0.6 !!!!!)
+        AC_MSG_WARN(In order to ensure the pdf module works correctly, you must)
+        AC_MSG_WARN(modify the pdflib distribution. Take out line 190 in)
+        AC_MSG_WARN(file p_basic.c which closes the pdf file. Read)
+        AC_MSG_WARN(the php3 documentation for more information.)
+        old_LIBS=$LIBS
+        LIBS="$LIBS -L$withval/lib"
+        AC_CHECK_LIB(pdf, PDF_open, [AC_DEFINE(HAVE_PDFLIB) PDFLIB_LIBS="-L$withval/lib -lpdf"],
+          [AC_MSG_ERROR(pdflib module requires at least pdflib 0.6.)])
+        LIBS=$old_LIBS
+      else
+        if test -f $withval/include/pdflib.h ; then
+          old_LIBS=$LIBS
+          AC_MSG_RESULT(yes)
+
+          old_withval=$withval
+          if test -z $ZLIB_LIBS; then
+          AC_MSG_CHECKING([for zlib (needed by pdflib 2.0)])
+          AC_ARG_WITH(zlib-dir,
+          [  --with-zlib-dir[=DIR]   zlib dir for pdflib 2.0 or include zlib support],[
+            AC_MSG_RESULT( )
+            if test -z $withval; then
+              withval="/usr/local"
+            fi
+            LIBS="$LIBS -L$withval/lib -lz"
+            AC_CHECK_LIB(z,deflate, [PDFLIB_LIBS="-L$withval/lib -lz"],[AC_MSG_RESULT(no)],)
+          ],[
+            AC_MSG_RESULT(no)
+            AC_MSG_WARN(If configure fails try --with-zlib=<DIR>)
+          ]) 
+          else
+          echo "checking for libz needed by pdflib 2.0... already zlib support"
+          PDFLIB_LIBS="$ZLIB_LIBS"
+          LIBS="$LIBS $ZLIB_LIBS"
+          fi
+
+          AC_MSG_CHECKING([for libjpeg (needed by pdflib 2.0)])
+          AC_ARG_WITH(jpeg-dir,
+          [  --with-jpeg-dir[=DIR]   jpeg dir for pdflib 2.0],[
+            AC_MSG_RESULT(yes)
+            if test -z $withval; then
+              withval="/usr/local"
+            fi
+            LIBS="$LIBS -L$withval/lib -ljpeg"
+            AC_CHECK_LIB(jpeg,jpeg_read_header, [PDFLIB_LIBS="$PDFLIB_LIBS -L$withval/lib -ljpeg"],[AC_MSG_RESULT(no)],)
+          ],[
+            AC_MSG_RESULT(no)
+            AC_MSG_WARN(If configure fails try --with-jpeg-dir=<DIR>)
+          ]) 
+          withval=$old_withval
+
+          AC_MSG_CHECKING([for libtiff (needed by pdflib 2.0)])
+          AC_ARG_WITH(tiff-dir,
+          [  --with-tiff-dir[=DIR]   tiff dir for pdflib 2.0],[
+            AC_MSG_RESULT(yes)
+            if test -z $withval; then
+              withval="/usr/local"
+            fi
+            LIBS="$LIBS -L$withval/lib -ltiff"
+            AC_CHECK_LIB(tiff,TIFFOpen, [PDFLIB_LIBS="$PDFLIB_LIBS -L$withval/lib -ltiff"],[AC_MSG_RESULT(no)],)
+          ],[
+            AC_MSG_RESULT(no)
+            AC_MSG_WARN(If configure fails try --with-tiff-dir=<DIR>)
+          ]) 
+          withval=$old_withval
+
+          LIBS="$LIBS -L$withval/lib"
+          AC_CHECK_LIB(pdf, PDF_new, [AC_DEFINE(HAVE_PDFLIB) AC_DEFINE(HAVE_PDFLIB2) PDFLIB_LIBS="$PDFLIB_LIBS -L$withval/lib -lpdf"],
+            [AC_MSG_ERROR(Check if zlib libjpeg and libtiff has been found.  If not specify --with-zlib-dir=<DIR> --with-jpeg-dir=<DIR> and --with-tiff-dir=<DIR>.)])
+          LIBS=$old_LIBS
+        else
+          AC_MSG_RESULT(no)
+        fi
+      fi ;;
+  esac
+],[
+  AC_MSG_RESULT(no)
+])
+AC_SUBST(PDFLIB_LIBS)
+AC_SUBST(PDFLIB_INCLUDE)
+
+
+AC_MSG_CHECKING(whether to include cpdflib support)
+AC_ARG_WITH(cpdflib,
+[  --with-cpdflib[=DIR]    Include ClibPDF support.
+                          DIR is the ClibPDF install directory,
+                          defaults to /usr/local.],
+[
+  case "$withval" in
+    no)
+      AC_MSG_RESULT(no) ;;
+    yes)
+      AC_MSG_RESULT(yes)
+      AC_CHECK_LIB(cpdf, cpdf_open, [AC_DEFINE(HAVE_CPDFLIB) CPDFLIB_LIBS="-lcpdf"],
+        [AC_MSG_ERROR(cpdflib module requires cpdflib)]) ;;
+    *)
+      test -f $withval/include/cpdflib.h && CPDFLIB_INCLUDE="-I$withval/include"
+      if test -n "$CPDFLIB_INCLUDE" ; then
+        AC_MSG_RESULT(yes)
+        old_LIBS=$LIBS
+        LIBS="$LIBS -L$withval/lib"
+        AC_CHECK_LIB(cpdf, cpdf_open, [AC_DEFINE(HAVE_CPDFLIB) CPDFLIB_LIBS="-L$withval/lib -lcpdf"],
+          [AC_MSG_ERROR(cpdflib module requires cpdflib)])
+        LIBS=$old_LIBS
+      else
+        AC_MSG_RESULT(no)
+      fi ;;
+  esac
+],[
+  AC_MSG_RESULT(no)
+])
+AC_SUBST(CPDFLIB_LIBS)
+AC_SUBST(CPDFLIB_INCLUDE)
+
+
+AC_MSG_CHECKING(whether to include fdftk support)
+AC_ARG_WITH(fdftk,
+[  --with-fdftk[=DIR]      Include fdftk support.
+                          DIR is the fdftk install directory,
+                          defaults to /usr/local.],
+[
+  case "$withval" in
+    no)
+      AC_MSG_RESULT(no) ;;
+    yes)
+      AC_MSG_RESULT(yes)
+      AC_CHECK_LIB(FdfTk, FDFOpen, [AC_DEFINE(HAVE_FDFLIB) FDFLIB_LIBS="-lFdfTk"],
+        [AC_MSG_ERROR(fdftk module requires fdftk 2.0)]) ;;
+    *)
+      test -f $withval/include/FdfTk.h && FDFLIB_INCLUDE="-I$withval/include"
+      if test -n "$FDFLIB_INCLUDE" ; then
+        AC_MSG_RESULT(yes)
+        old_LIBS=$LIBS
+        LIBS="$LIBS -L$withval/lib"
+        AC_CHECK_LIB(FdfTk, FDFOpen, [AC_DEFINE(HAVE_FDFLIB) FDFLIB_LIBS="-L$withval/lib -lFdfTk"],
+          [AC_MSG_ERROR(fdftk module requires ftftk lib 2.0.)])
+        LIBS=$old_LIBS
+      else
+        AC_MSG_RESULT(no)
+      fi ;;
+  esac
+],[
+  AC_MSG_RESULT(no)
+])
+AC_SUBST(FDFLIB_LIBS)
+AC_SUBST(FDFLIB_INCLUDE)
+
+
+AC_MSG_CHECKING(whether to include the bundled dbase library)
+AC_ARG_WITH(dbase,
+[  --with-dbase            Include the bundled dbase library],
+[
+  if test "$withval" = "yes"; then
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(DBASE,1)
+	DBASE_LIB=dbase/libdbf.a
+	DBASE_LIBS="-L./dbase -ldbf"
+	DBASE_OBJS="\$(DBF_OBJS)"
+  else
+	AC_MSG_RESULT(no)
+	AC_DEFINE(DBASE,0)
+	DBASE_LIB=
+	DBASE_OBJS=
+  fi
+],[
+  AC_MSG_RESULT(no)
+  AC_DEFINE(DBASE,0)
+  DBASE_LIB=
+])
+AC_SUBST(DBASE_LIB)
+AC_SUBST(DBASE_LIBS)
+AC_SUBST(DBASE_OBJS)
+
+AC_MSG_CHECKING(whether to include the bundled filePro support)
+AC_ARG_WITH(filepro,
+[  --with-filepro          Include the bundled read-only filePro support],[
+  if test "$withval" = "yes"; then
+    AC_DEFINE(HAVE_FILEPRO, 1)
+    AC_MSG_RESULT(yes)
+  else
+    AC_DEFINE(HAVE_FILEPRO, 0)
+    AC_MSG_RESULT(no)
+  fi
+],[
+  AC_DEFINE(HAVE_FILEPRO, 0)
+  AC_MSG_RESULT(no)
+]) 
+
+
+AC_MSG_CHECKING(whether to enable DAV support through mod_dav)
+AC_ARG_WITH(mod-dav,
+[  --with-mod-dav=DIR      Include DAV support through Apache's mod_dav,
+                          DIR is mod_dav's installation directory (Apache
+                          module version only!)],
+[
+  if test "$withval" = "yes"; then
+    AC_MSG_ERROR(Must give parameter to --with-mod-dav!)
+  else
+    if test "$withval" != "no"; then
+      AC_MSG_RESULT(yes)
+      AC_DEFINE(HAVE_MOD_DAV, 1)
+      MOD_DAV_CFLAGS="-DHAVE_MOD_DAV -I$withval"
+      APACHE_INCLUDE="$APACHE_INCLUDE -I$withval"
+    else
+      AC_MSG_RESULT(no)
+      AC_DEFINE(HAVE_MOD_DAV, 0)
+    fi
+  fi
+],[
+  AC_MSG_RESULT(no)
+  AC_DEFINE(HAVE_MOD_DAV, 0)
+])
+AC_SUBST(MOD_DAV_CFLAGS)
+
+AC_MSG_CHECKING(whether to enable unified ODBC support)
+AC_ARG_ENABLE(unified-odbc,
+[  --disable-unified-odbc  Disable unified ODBC support. Only applicable if
+                          iODBC, Adabas, Solid, Velocis or a custom ODBC
+                          interface is enabled.],
+[
+  if test "$enableval" = "no"; then
+    AC_DEFINE(HAVE_UODBC, 0)
+    AC_MSG_RESULT(no)
+  else
+    if test "$with_solid" != ""; then
+      UODBC_TYPE=solid
+    elif test "$with_iodbc" != ""; then
+      UODBC_TYPE=iodbc
+    elif test "$with_adabas" != ""; then
+      UODBC_TYPE=adabas
+    elif test "$with_velocis" != ""; then
+      UODBC_TYPE=velocis
+    elif test "$with_custom_odbc" != ""; then
+      UODBC_TYPE=custom
+    else
+      AC_MSG_ERROR([no ODBC library!  Include Solid, iODBC, Velocis, Adabas D or a custom ODBC support.])
+    fi
+    AC_DEFINE(HAVE_UODBC, 1)
+    AC_MSG_RESULT([yes, using $UODBC_TYPE])
+  fi
+],[
+  if test "$UODBC_DEFAULT" = "yes"; then
+  	AC_DEFINE(HAVE_UODBC, 1)
+  	AC_MSG_RESULT(yes)
+  else
+  	AC_DEFINE(HAVE_UODBC, 0)
+  	AC_MSG_RESULT(no)
+  fi
+])
+
+
+
+
+
+
+
+AC_MSG_CHECKING(whether to use a configuration file)
+AC_ARG_WITH(config-file-path,
+[  --with-config-file-path=PATH  Sets the path in which to look for php3.ini
+                          defaults to /usr/local/lib],
+[
+  if test "$withval" = "yes"; then
+    AC_DEFINE_UNQUOTED(CONFIGURATION_FILE_PATH, "/usr/local/lib")
+    AC_DEFINE(USE_CONFIG_FILE, 1)
+    AC_MSG_RESULT(yes)
+  else
+    if test "$withval" != "no"; then
+      AC_DEFINE_UNQUOTED(CONFIGURATION_FILE_PATH, "$withval")
+      AC_DEFINE(USE_CONFIG_FILE, 1)
+      AC_MSG_RESULT(yes)
+    else
+      AC_DEFINE(CONFIGURATION_FILE_PATH, 0)
+      AC_DEFINE(USE_CONFIG_FILE, 0)
+      AC_MSG_RESULT(no)
+    fi
+  fi
+],[
+  AC_DEFINE_UNQUOTED(CONFIGURATION_FILE_PATH, "/usr/local/lib")
+  AC_DEFINE(USE_CONFIG_FILE, 1)
+  AC_MSG_RESULT(yes)
+]) 
+
+
+AC_MSG_CHECKING(whether to include debugging symbols)
+AC_ARG_ENABLE(debug,
+[  --enable-debug          Compile with debugging symbols],
+[
+  if test "$enableval" = "yes"; then
+    AC_MSG_RESULT(yes)
+    AC_DEFINE(DEBUG,1)
+    PHP_DEBUG=1
+    DEBUG_CFLAGS="-g"
+    test -n "$GCC" && DEBUG_CFLAGS="$DEBUG_CFLAGS -Wall"
+    test -n "$GCC" && test "$USE_MAINTAINER_MODE" = "yes" && \
+      DEBUG_CFLAGS="$DEBUG_CFLAGS -Wmissing-prototypes -Wstrict-prototypes -Wmissing-declarations"
+  else
+    AC_MSG_RESULT(no)
+    AC_DEFINE(DEBUG,0)
+    PHP_DEBUG=0
+    DEBUG_CFLAGS=""
+  fi
+],[
+  AC_MSG_RESULT(no)
+  AC_DEFINE(DEBUG,0)
+  PHP_DEBUG=0
+  DEBUG_CFLAGS=""
+]) 
+AC_SUBST(DEBUG_CFLAGS)
+AC_SUBST(PHP_DEBUG)
+
+
+AC_MSG_CHECKING(whether to enable safe mode by default)
+AC_ARG_ENABLE(safe-mode,
+[  --enable-safe-mode      Enable safe mode by default.],
+[
+  if test "$enableval" = "yes"; then
+    AC_DEFINE(PHP_SAFE_MODE, 1)
+    AC_MSG_RESULT(yes)
+  else
+    AC_DEFINE(PHP_SAFE_MODE, 0)
+    AC_MSG_RESULT(no)
+  fi
+],[
+    AC_DEFINE(PHP_SAFE_MODE, 0)
+    AC_MSG_RESULT(no)
+]) 
+
+
+AC_MSG_CHECKING(for safe mode exec dir)
+AC_ARG_WITH(exec-dir,
+[  --with-exec-dir[=DIR]   Only allow executables in DIR when in safe mode
+                          defaults to /usr/local/php/bin],
+[
+  if test "$withval" != "no"; then
+  	if test "$withval" = "yes"; then
+		AC_DEFINE(PHP_SAFE_MODE_EXEC_DIR,"/usr/local/php/bin")
+    	AC_MSG_RESULT(/usr/local/php/bin)
+   	else
+		AC_DEFINE_UNQUOTED(PHP_SAFE_MODE_EXEC_DIR,"$withval")
+    	AC_MSG_RESULT($withval)
+   	fi
+  else
+	AC_DEFINE(PHP_SAFE_MODE_EXEC_DIR,"/usr/local/php/bin")
+   	AC_MSG_RESULT(/usr/local/php/bin)
+  fi
+],[
+	AC_DEFINE(PHP_SAFE_MODE_EXEC_DIR,"/usr/local/php/bin")
+   	AC_MSG_RESULT(/usr/local/php/bin)
+])
+
+
+AC_MSG_CHECKING(whether to enable PHP's own SIGCHLD handler)
+AC_ARG_ENABLE(sigchild,
+[  --enable-sigchild       Enable PHP's own SIGCHLD handler.],
+[
+  if test "$enableval" = "yes"; then
+    AC_DEFINE(PHP_SIGCHILD, 1)
+    AC_MSG_RESULT(yes)
+  else
+    AC_DEFINE(PHP_SIGCHILD, 0)
+    AC_MSG_RESULT(no)
+  fi
+],[
+    AC_DEFINE(PHP_SIGCHILD, 0)
+    AC_MSG_RESULT(no)
+]) 
+
+AC_MSG_CHECKING(whether to enable track_vars variables by default)
+AC_ARG_ENABLE(track-vars,
+[  --enable-track-vars     Enable GET/POST/Cookie track variables by default.],
+[
+  if test "$enableval" = "yes"; then
+    AC_DEFINE(PHP_TRACK_VARS, 1)
+    AC_MSG_RESULT(yes)
+  else
+    AC_DEFINE(PHP_TRACK_VARS, 0)
+    AC_MSG_RESULT(no)
+  fi
+],[
+    AC_DEFINE(PHP_TRACK_VARS, 0)
+    AC_MSG_RESULT(no)
+]) 
+
+
+AC_MSG_CHECKING(whether to enable magic quotes by default)
+AC_ARG_ENABLE(magic-quotes,
+[  --enable-magic-quotes   Enable magic quotes by default.],
+[
+  if test "$enableval" = "yes"; then
+    AC_DEFINE(MAGIC_QUOTES, 1)
+    AC_MSG_RESULT(yes)
+  else
+    AC_DEFINE(MAGIC_QUOTES, 0)
+    AC_MSG_RESULT(no)
+  fi
+],[
+    AC_DEFINE(MAGIC_QUOTES, 0)
+    AC_MSG_RESULT(no)
+]) 
+
+
+AC_MSG_CHECKING(whether to enable remote debugger support)
+AC_ARG_ENABLE(debugger,
+[  --enable-debugger       Compile with remote debugging functions.],
+[
+  if test "$enableval" = "yes"; then
+    AC_DEFINE(PHP_DEBUGGER, 1)
+    AC_MSG_RESULT(yes)
+  else
+    AC_DEFINE(PHP_DEBUGGER, 0)
+    AC_MSG_RESULT(no)
+  fi
+],[
+  AC_DEFINE(PHP_DEBUGGER, 0)
+  AC_MSG_RESULT(no)
+]) 
+
+
+dnl AC_MSG_CHECKING(whether to enable PHP RPC support)
+dnl AC_ARG_ENABLE(php-rpc,
+dnl [  --enable-php-rpc        Compile with PHP RPC support.],
+dnl [
+dnl   if test "$enableval" = "yes"; then
+dnl 	AC_DEFINE(PHP_RPC, 1)
+dnl 	AC_MSG_RESULT(yes)
+dnl   else
+dnl 	AC_DEFINE(PHP_RPC, 0)
+dnl 	AC_MSG_RESULT(no)
+dnl   fi
+dnl ],[
+dnl   AC_DEFINE(PHP_RPC, 0)
+dnl   AC_MSG_RESULT(no)
+dnl ])
+
+AC_MSG_CHECKING(whether to enable bc style precision math functions)
+AC_ARG_ENABLE(bcmath,
+[  --disable-bcmath        Compile without bc style precision math functions. ],
+[
+  if test "$enableval" = "yes"; then
+    AC_DEFINE(WITH_BCMATH, 1)
+    AC_MSG_RESULT(yes)
+    BCMATH_SRC="functions/bcmath.c functions/number.c"
+  else
+    AC_DEFINE(WITH_BCMATH, 0)
+    AC_MSG_RESULT(no)
+    BCMATH_SRC=""
+  fi
+],[
+  AC_DEFINE(WITH_BCMATH, 1)
+  AC_MSG_RESULT(yes)
+  BCMATH_SRC="functions/bcmath.c functions/number.c"
+]) 
+AC_SUBST(BCMATH_SRC)
+
+if test "$BINNAME" = "php"; then
+AC_MSG_CHECKING(whether to force Apache CGI redirect)
+AC_ARG_ENABLE(force-cgi-redirect,
+[  --enable-force-cgi-redirect Enable the security check for internal server
+                              redirects.  You should use this if you are
+                              running the CGI version with Apache. ],
+[
+  if test "$enableval" = "yes"; then
+    AC_DEFINE(FORCE_CGI_REDIRECT, 1)
+    AC_MSG_RESULT(yes)
+    REDIRECT=1
+  else
+    AC_DEFINE(FORCE_CGI_REDIRECT, 0)
+    AC_MSG_RESULT(no)
+    REDIRECT=0
+  fi
+],[
+  AC_DEFINE(FORCE_CGI_REDIRECT, 0)
+  AC_MSG_RESULT(no)
+  REDIRECT=0
+]) 
+
+AC_MSG_CHECKING(whether to discard path_info + path_translated)
+AC_ARG_ENABLE(discard_path,
+[  --enable-discard-path   If this is enabled, the PHP CGI binary
+                          can safely be placed outside of the
+                          web tree and people will not be able
+                          to circumvent .htaccess security. ],
+[
+  if test "$enableval" = "yes"; then
+    AC_DEFINE(DISCARD_PATH, 1)
+    AC_MSG_RESULT(yes)
+    DISCARD_PATH=1
+  else
+    AC_DEFINE(DISCARD_PATH, 0)
+    AC_MSG_RESULT(no)
+    DISCARD_PATH=0
+  fi
+],[
+  AC_DEFINE(DISCARD_PATH, 0)
+  AC_MSG_RESULT(no)
+  DISCARD_PATH=0
+]) 
+fi
+
+AC_MSG_CHECKING(whether to enable a memory limit)
+AC_ARG_ENABLE(memory-limit,
+[  --enable-memory-limit   Compile with memory limit support. ],
+[
+  if test "$enableval" = "yes"; then
+    AC_DEFINE(MEMORY_LIMIT, 1)
+    AC_MSG_RESULT(yes)
+  else
+    AC_DEFINE(MEMORY_LIMIT, 0)
+    AC_MSG_RESULT(no)
+  fi
+],[
+  AC_DEFINE(MEMORY_LIMIT, 0)
+  AC_MSG_RESULT(no)
+]) 
+
+AC_MSG_CHECKING(whether to enable short tags by default)
+AC_ARG_ENABLE(short-tags,
+[  --disable-short-tags    Disable the short-form <? start tag by default.],
+[
+  if test "$enableval" = "no"; then
+    AC_DEFINE(DEFAULT_SHORT_OPEN_TAG, 0)
+    AC_MSG_RESULT(no)
+  else
+    AC_DEFINE(DEFAULT_SHORT_OPEN_TAG, 1)
+    AC_MSG_RESULT(yes)
+  fi
+],[
+  AC_DEFINE(DEFAULT_SHORT_OPEN_TAG, 1)
+  AC_MSG_RESULT(yes)
+]) 
+
+AC_MSG_CHECKING(whether to enable the URL-aware fopen wrapper)
+AC_ARG_ENABLE(url-fopen-wrapper,
+[  --disable-url-fopen-wrapper Disable the URL-aware fopen wrapper that allows
+                              accessing files via http or ftp.],
+[
+  if test "$enableval" = "yes"; then
+    AC_DEFINE(PHP3_URL_FOPEN, 1)
+    AC_MSG_RESULT(yes)
+  else
+    AC_DEFINE(PHP3_URL_FOPEN, 0)
+    AC_MSG_RESULT(no)
+  fi
+],[
+  AC_DEFINE(PHP3_URL_FOPEN, 1)
+  AC_MSG_RESULT(yes)
+])
+
+AC_MSG_CHECKING(whether to enable System V semaphore support)
+AC_ARG_ENABLE(sysvsem,
+[  --enable-sysvsem        Enable System V semaphore support.],
+[
+  if test "$enableval" = "yes"; then
+    AC_MSG_RESULT(yes)
+    AC_DEFINE(HAVE_SYSVSEM, 1)
+    AC_CACHE_CHECK(for union semun,php_cv_semun,
+	    AC_TRY_COMPILE([
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/sem.h>
+			],
+			[union semun x;],
+			[
+				php_cv_semun=yes
+			],[
+				php_cv_semun=no
+			])
+		)
+	if test $php_cv_semun = "yes"; then
+		AC_DEFINE(HAVE_SEMUN, 1)
+	else
+		AC_DEFINE(HAVE_SEMUN, 0)
+	fi
+  else
+    AC_MSG_RESULT(no)
+    AC_DEFINE(HAVE_SYSVSEM, 0)
+  fi
+],[
+  AC_MSG_RESULT(no)
+  AC_DEFINE(HAVE_SYSVSEM, 0)
+])
+
+
+AC_MSG_CHECKING(whether to enable System V shared memory support)
+AC_ARG_ENABLE(sysvshm,
+[  --enable-sysvshm        Enable the System V shared memory support],[
+  if test "$enableval" = "yes"; then
+    AC_DEFINE(HAVE_SYSVSHM, 1)
+    AC_MSG_RESULT(yes)
+  else
+    AC_DEFINE(HAVE_SYSVSHM, 0)
+    AC_MSG_RESULT(no)
+  fi
+],[
+  AC_DEFINE(HAVE_SYSVSHM, 0)
+  AC_MSG_RESULT(no)
+]) 
+
+AC_MSG_CHECKING(whether to enable displaying source support)
+AC_ARG_ENABLE(display-source,
+[  --disable-display-source  Compile without displaying source support],[
+   if test "$enableval" = "yes"; then
+     AC_DEFINE(HAVE_DISPLAY_SOURCE, 1)
+     AC_MSG_RESULT(yes)
+   else
+     AC_DEFINE(HAVE_DISPLAY_SOURCE, 0)
+     AC_MSG_RESULT(no)
+   fi
+],[
+  AC_DEFINE(HAVE_DISPLAY_SOURCE, 1)
+  AC_MSG_RESULT(yes)
+])
+
+AC_ARG_WITH(gdbm,
+[  --with-gdbm[=DIR]       Include GDBM support],[
+  if test "$withval" != "no"; then
+    for i in /usr/local /usr $withval; do
+      if test -f "$i/include/gdbm.h"; then
+        THIS_PREFIX="$i"
+      fi
+    done
+
+    unset ac_cv_lib_gdbm_gdbm_open
+    AC_TEMP_LDFLAGS(-L$THIS_PREFIX/lib,[
+    AC_CHECK_LIB(gdbm, gdbm_open, [AC_DEFINE(DBA_GDBM, 1) THIS_LIBS="gdbm"])
+    ])
+    
+    AC_DBA_STD_ASSIGN
+    AC_DBA_STD_CHECK
+    AC_DBA_STD_ATTACH
+  fi
+])
+AC_MSG_CHECKING(for GDBM support)
+AC_DBA_STD_RESULT
+
+AC_ARG_WITH(ndbm,
+[  --with-ndbm[=DIR]       Include NDBM support],[
+  if test "$withval" != "no"; then
+    for i in /usr/local /usr $withval; do
+      if test -f "$i/include/db1/ndbm.h" ; then
+        THIS_PREFIX="$i"
+        NDBM_EXTRA="NDBM_DB1_NDBM_H"
+      elif test -f "$i/include/ndbm.h" ; then
+        THIS_PREFIX="$i"
+        NDBM_EXTRA="NDBM_NDBM_H"
+      fi
+	done
+    
+    if test "$NDBM_EXTRA" != ""; then
+      eval "AC_DEFINE($NDBM_EXTRA, 1)"
+    fi
+
+    for LIB in db1 ndbm c; do
+      AC_TEMP_LDFLAGS(-L$THIS_PREFIX/lib,[
+      AC_CHECK_LIB($LIB, dbm_open, [AC_DEFINE(DBA_NDBM,1) THIS_LIBS="$LIB"])
+      ])
+    done
+    
+    AC_DBA_STD_ASSIGN
+    AC_DBA_STD_CHECK
+    AC_DBA_STD_ATTACH
+  fi
+])
+AC_MSG_CHECKING(for NDBM support)
+AC_DBA_STD_RESULT
+
+AC_ARG_WITH(db2,
+[  --with-db2[=DIR]        Include Berkeley DB2 support],[
+  if test "$withval" != "no"; then
+    for i in /usr/local /usr /usr/BerkeleyDB $withval; do
+      if test -f "$i/db2/db.h"; then
+        THIS_PREFIX="$i"
+        DB2_EXTRA="db2"
+      elif test -f "$i/include/db2/db.h"; then
+        THIS_PREFIX="$i"
+        DB2_EXTRA="DB2_DB2_DB_H"
+      elif test -f "$i/include/db/db2.h"; then
+        THIS_PREFIX="$i"
+        DB2_EXTRA="DB2_DB_DB2_H"
+      elif test -f "$i/include/db2.h"; then
+        THIS_PREFIX="$i"
+        DB2_EXTRA="DB2_DB2_H"
+      elif test -f "$i/include/db.h" ; then
+        THIS_PREFIX="$i"
+        DB2_EXTRA="DB2_DB_H"
+      fi
+	done
+
+    if test "$DB2_EXTRA" = "db2" ; then
+      DBA_INCLUDE="$DBA_INCLUDE -I$THIS_PREFIX/db2"
+      DB2_EXTRA="DB2_DB_H"
+    fi
+    
+    if test "$DB2_EXTRA" != ""; then
+      eval "AC_DEFINE($DB2_EXTRA, 1)"
+    fi
+
+    for LIB in db db2 c; do
+      AC_TEMP_LDFLAGS(-L$THIS_PREFIX/lib,[
+      AC_CHECK_LIB($LIB, db_appinit, [AC_DEFINE(DBA_DB2,1) THIS_LIBS="$LIB"])
+      ])
+    done
+    
+    AC_DBA_STD_ASSIGN
+    AC_DBA_STD_CHECK
+    AC_DBA_STD_ATTACH
+  fi
+])
+AC_MSG_CHECKING(for Berkeley DB2 support)
+AC_DBA_STD_RESULT
+
+AC_ARG_WITH(dbm,
+[  --with-dbm[=DIR]        Include DBM support],[
+  if test "$withval" != "no"; then
+    for i in /usr/local /usr $withval; do
+      if test -f "$i/include/dbm.h" ; then
+        THIS_PREFIX="$i"
+      fi
+	done
+
+    for LIB in db1 dbm c; do
+      AC_TEMP_LDFLAGS(-L$THIS_PREFIX/lib,[
+      AC_CHECK_LIB($LIB, dbminit, [AC_DEFINE(DBA_DBM,1) THIS_LIBS="$LIB"])
+      ])
+    done
+    
+    AC_DBA_STD_ASSIGN
+    AC_DBA_STD_CHECK
+    AC_DBA_STD_ATTACH
+  fi
+])
+AC_MSG_CHECKING(for DBM support)
+AC_DBA_STD_RESULT
+
+AC_ARG_WITH(cdb,
+[  --with-cdb[=DIR]        Include CDB support],[
+  if test "$withval" != "no"; then
+    for i in /usr/local /usr $withval; do
+      if test -f "$i/include/cdb.h" ; then
+        THIS_PREFIX="$i"
+      fi
+	done
+
+    for LIB in cdb c; do
+      AC_TEMP_LDFLAGS(-L$THIS_PREFIX/lib,[
+      AC_CHECK_LIB($LIB, cdb_bread, [AC_DEFINE(DBA_CDB,1) THIS_LIBS="$LIB"])
+      ])
+    done
+    
+    AC_DBA_STD_ASSIGN
+    AC_DBA_STD_CHECK
+    AC_DBA_STD_ATTACH
+  fi
+])
+AC_MSG_CHECKING(for CDB support)
+AC_DBA_STD_RESULT
+
+AC_MSG_CHECKING(whether to enable DBA interface)
+if test "$HAVE_DBA" = "1"; then
+  AC_MSG_RESULT(yes)
+  AC_DEFINE(HAVE_DBA, 1)
+else
+  AC_MSG_RESULT(no)
+  AC_DEFINE(HAVE_DBA, 0)
+fi
+
+AC_MSG_CHECKING(for mcrypt support)
+AC_ARG_WITH(mcrypt,
+[  --with-mcrypt[=DIR]     Include mcrypt support.  DIR is the mcrypt
+                          install directory.],
+[
+  if test "$withval" != "no"; then
+    for i in /usr/local /usr $withval; do
+      if test -f $i/include/mcrypt.h; then
+        MCRYPT_DIR=$i
+      fi
+    done
+    if test "$MCRYPT_DIR" = ""; then
+      AC_MSG_ERROR(Please install mcrypt.h and libmcrypt.a as explained in the documentation - I cannot find mcrypt.h)
+    fi
+    AC_ADD_INCLUDE($MCRYPT_DIR/include)
+    AC_ADD_LIBRARY_WITH_PATH(mcrypt, $MCRYPT_DIR/lib)
+
+    AC_DEFINE(HAVE_LIBMCRYPT)
+
+    AC_MSG_RESULT(yes)
+    PHP_EXTENSION(mcrypt)
+  else
+    AC_MSG_RESULT(no)
+  fi
+],[
+  AC_MSG_RESULT(no)
+])
+
+AC_MSG_CHECKING(for mhash support)
+AC_ARG_WITH(mhash,
+[  --with-mhash[=DIR]      Include mhash support.  DIR is the mhash
+                          install directory.],
+[
+  if test "$withval" != "no"; then
+    for i in /usr/local /usr /opt/mhash $withval; do
+      if test -f $i/include/mhash.h; then
+        MHASH_DIR=$i
+      fi
+    done
+    if test "$MHASH_DIR" = ""; then
+      AC_MSG_ERROR(Please reinstall libmhash - I cannot find mhash.h)
+    fi
+    AC_ADD_INCLUDE($MHASH_DIR/include)
+    AC_ADD_LIBRARY_WITH_PATH(mhash, $MHASH_DIR/lib)
+
+    AC_DEFINE(HAVE_LIBMHASH)
+
+    AC_MSG_RESULT(yes)
+    PHP_EXTENSION(mhash)
+  else
+    AC_MSG_RESULT(no)
+  fi
+],[
+  AC_MSG_RESULT(no)
+])
+
+AC_MSG_CHECKING(whether to include PCRE support)
+AC_ARG_WITH(pcre-regex,
+[  --without-pcre-regex    Don't include Perl Compatible Regular Expressions support],[
+  if test "$withval" = "yes"; then
+    PCRE_LIB="pcrelib/libpcre.a"
+    PCRE_LIBS="-Lpcrelib -lpcre"
+    PCRE_OBJS="\$(PCRE_OBJS)"
+    AC_DEFINE(HAVE_PCRE, 1)
+    AC_MSG_RESULT(yes)
+  else
+    AC_MSG_RESULT(no)
+  fi
+],[
+  PCRE_LIB="pcrelib/libpcre.a"
+  PCRE_LIBS="-Lpcrelib -lpcre"
+  PCRE_OBJS="\$(PCRE_OBJS)"
+  AC_DEFINE(HAVE_PCRE, 1)
+  AC_MSG_RESULT(yes)
+])
+AC_SUBST(PCRE_LIB)
+AC_SUBST(PCRE_LIBS)
+AC_SUBST(PCRE_OBJS)
+
+AC_CHECK_FUNC(memmove, [], [AC_DEFINE(USE_BCOPY, 1)])
+
+AC_MSG_CHECKING(whether to include POSIX support)
+AC_ARG_WITH(posix,
+[  --without-posix         Don't include POSIX functions],[
+  if test "$withval" = "yes"; then
+    AC_DEFINE(HAVE_POSIX, 1)
+    AC_MSG_RESULT(yes)
+  else
+    AC_MSG_RESULT(no)
+  fi
+],[
+  AC_DEFINE(HAVE_POSIX, 1)
+  AC_MSG_RESULT(yes)
+])
+
+RESULT=no
+AC_MSG_CHECKING(whether to include GNU recode support)
+AC_ARG_WITH(recode,
+[  --with-recode[=DIR]     Include GNU recode support.],
+[
+    if test "$withval" != "no"; then
+        for i in /usr/local /usr /opt/recode $withval; do
+            if test -f $i/include/recode.h; then
+                RECODE_DIR=$i
+                RECODE_INC=
+            elif test -f $i/include/recode/recode.h; then
+                RECODE_DIR=$i
+                RECODE_INC=/recode
+            fi
+        done
+
+        if test -z "$RECODE_DIR"; then
+            AC_MSG_ERROR(Cannot find recode.h. Please install recode-3.5 or higher)
+        fi
+
+        AC_ADD_INCLUDE($RECODE_DIR$RECODE_INC)
+		
+        old_LDFLAGS="$LDFLAGS"
+        old_LIBS="$LIBS"
+        LDFLAGS="$LDFLAGS -L$RECODE_DIR/lib"
+        LIBS="$LIBS -lrecode"
+        AC_TRY_LINK([
+char *program_name;
+],[
+recode_format_table();
+],[],[
+            AC_MSG_ERROR(Cannot find librecode. Please install recode-3.5 or higher)])
+        LIBS="$old_LIBS"
+        LDFLAGS="$old_LDFLAGS"
+
+        AC_ADD_LIBRARY_WITH_PATH(recode, $RECODE_DIR/lib)
+        AC_DEFINE(HAVE_RECODE)
+        RESULT=yes
+	fi
+])
+AC_MSG_RESULT($RESULT)
+
+AC_MSG_CHECKING(whether to enable dmalloc support)
+AC_ARG_ENABLE(dmalloc,
+[  --enable-dmalloc        Enable dmalloc],
+[
+  if test "$enableval" = "yes" ; then
+    LIBS="$LIBS -ldmalloc"
+    CFLAGS="$CFLAGS -DDMALLOC_FUNC_CHECK"
+    AC_DEFINE(HAVE_DMALLOC, 1)
+    AC_MSG_RESULT(yes)
+  else
+    AC_MSG_RESULT(no)
+  fi
+],[AC_MSG_RESULT(no)])
+
+AC_CHECK_LIB(bind, __dn_skipname, [ AC_ADD_LIBRARY(bind) ])
+
+dnl if test -z "$APXS" || test "$APXS_CC" = "$CC" ; then
+dnl might cause more problems than it solves
+dnl we need a better test ...
+dnl AC_CHECK_LIB(gcc, __udivdi3, [ AC_ADD_LIBRARY(gcc)])
+dnl fi
+	
+dnl If we're using gcc and the user hasn't specified CFLAGS, add -O2.
+test -n "$auto_cflags" && test -n "$GCC" && CFLAGS="$CFLAGS -O2"
+
+dnl *** Commented out - generates slow code and consumes a lot of 
+dnl *** resources during compilation - we need to figure out how
+dnl *** to supply it only when absolutely necessary
+dnl If we're using gcc add -fpic to make dl() work on some platforms
+dnl test -n "$GCC" && CFLAGS="$CFLAGS -fpic"
+
+AC_SUBST(CFLAGS)
+AC_SUBST(PROG_SENDMAIL)
+AC_SUBST(CFLAGS_SHLIB)
+AC_SUBST(LDFLAGS_SHLIB)
+AC_SUBST(INCLUDES)
+AC_SUBST(EXTRA_LIBS)
+AC_SUBST(RPATHS)
+	
+dnl Create the necessary directories if building using VPATH
+if test ! -d functions; then
+	mkdir functions
+fi
+if test ! -d extra; then
+	mkdir extra
+fi
+if test ! -d extra/gd; then
+	mkdir extra/gd
+fi
+
+PHP_BUILD_DATE=`date '+%Y-%m-%d'`
+AC_SUBST(PHP_BUILD_DATE)
+AC_DEFINE_UNQUOTED(PHP_BUILD_DATE,"$PHP_BUILD_DATE")
+PHP_UNAME=`uname -a`
+AC_DEFINE_UNQUOTED(PHP_UNAME,"$PHP_UNAME")
+PHP_OS=`uname`
+AC_DEFINE_UNQUOTED(PHP_OS,"$PHP_OS")
+
+AC_OUTPUT(Makefile build-defs.h stamp-h libphp3.module
+	  extra/gd/bdf2gdfont regex/Makefile pcrelib/Makefile dbase/Makefile, [
+  chmod +x extra/gd/bdf2gdfont
+], [
+
+if test -n "$PHP_APXS_BROKEN" ; then
+	echo "=================================================================="
+	echo "WARNING: Your $APXS script is most likely broken."
+	echo ""
+	echo "Please go read http://www.php.net/FAQ.php3#6.11 and make the"
+	echo "changes described there and try again."
+	echo "=================================================================="
+fi
+
+if test -n "$APXS_CC" && test "$APXS_CC" != "$CC" ; then
+  echo "=================================================================="
+  echo "WARNING: You have chosen to compile PHP with a different compiler"
+  echo "         as you used for compiling Apache."
+  echo ""
+  echo "    Current compiler:      $CC"
+  echo "   Apache's compiler:      $APXS_CC"
+  echo ""
+  echo "This might result in an unusable PHP module and linking problems."
+  echo "=================================================================="
+fi
+
+dnl Warn about CGI version with no extra security options.
+if test "$BINNAME" = "php"; then
+	if test "$REDIRECT" = "0"; then
+		if test "$DISCARD_PATH" = "0"; then
+		echo "WARNING: You will be compiling the CGI version of PHP without any"
+		echo "         redirection checking.  By putting this cgi binary somewhere"
+		echo "         in your web space, users may be able to circumvent existing .htaccess"
+		echo "         security by loading files directly through the parser.  See"
+		echo "         http://www.php.net/manual/security.php for more details."
+		fi
+	fi
+fi
+dnl Warn if Informix support was requested but environment is not set up correctly.
+if test "$INFORMIX_WARNING" != ""; then
+		echo "$INFORMIX_WARNING"
+fi
+if test "$T1LIB_WARNING" != ""; then
+		echo "$T1LIB_WARNING"
+fi
+])
+# Local Variables:
+# tab-width: 4
+# End:

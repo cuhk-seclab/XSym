@@ -1,0 +1,10 @@
+char* _php3_strtolower(char*);
+#include <stdio.h>
+#include "phli.h"
+int main(int argc, char *argv[]) { 
+	char* result_dir = "/data/phli/results/_php3_strtolower/";
+	char* arg_0 = phli_create_char_array("arg_0");
+	char* phli_result;
+	phli_result = _php3_strtolower(arg_0);
+    phli_print_string(phli_result, strlen(phli_result), result_dir);
+}
