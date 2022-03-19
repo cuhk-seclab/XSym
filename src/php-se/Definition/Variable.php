@@ -121,7 +121,21 @@ class Variable {
         }
         return NULL;
     }
-            
+        
+
+}
+
+class Operation extends Variable {
+    public $Left;
+    public $Right;
+    public $Operator;
+
+    public function __construct ($left, $right, $operator) {
+        $this->Left = $left;
+        $this->Right = $right;
+        $this->Operator = $operator;
+    }
+
 
     static public function BitwiseAnd($lhs, $rhs) {
         return new Operation($lhs, $rhs, '&');
@@ -213,17 +227,11 @@ class Variable {
     static public function Cast($lhs, $type) {
         return new Operation($lhs, NULL, 'Cast_' . $type);
     }
-}
 
-class Operation extends Variable {
-    public $Left;
-    public $Right;
-    public $Operator;
-
-    public function __construct ($left, $right, $operator) {
-        $this->Left = $left;
-        $this->Right = $right;
-        $this->Operator = $operator;
+    static public function realprint($op) {
+        $t = printexpr($op->Left->Value) . $op->Operator . printexpr($op->Right->Value) . "\n";
+        print($t);
+        return $t;
     }
 }
 

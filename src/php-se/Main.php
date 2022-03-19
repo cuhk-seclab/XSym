@@ -9,21 +9,6 @@ include_once __DIR__ ."/Definition/Constants.php";
 include_once __DIR__ ."/Definition/GlobalVariable.php";
 include_once __DIR__ ."/Execution.php";
 include_once __DIR__ ."/Definition/Slice.php";
-$BothTaintInfo = [];
-$OneTaintInfo = [];
-$FromEncryptInfo = [];
-$FromDatabaseInfo = [];
-$XSSInfo = [];
-$SQLiInfo = []; 
-$LooseCompInfo = []; 
-$DataAccessInfo = []; 
-
-$LooseComp1log = [];
-$LooseComp2log = [];
-$SQLilog = [];
-$ACClog = [];
-$XSSlog = [];
-$Authlog = [];
 
 /**
  * Start Analysis
@@ -36,7 +21,7 @@ function MainAnalysisStart($AppPath) {
     $Class = $AllClasses[MAIN_CLASS];
     $ClassName = MAIN_CLASS;
     foreach($Class->ClassMethods as $MethodName => $Method) {
-        if($Method->visited == false) {
+        if($Method->visited == false && substr($MethodName, -4 ) == ".php") {
             $Analyzer = new Execution();
             $Slice = new Slice($ClassName, $MethodName, $Method->FileName);
             $Method->FuncVisit = true;
@@ -44,6 +29,7 @@ function MainAnalysisStart($AppPath) {
             $pos = 0;
             foreach($Method->Params as $paramname => $value) {
                 $newparam =  new Variable("argtype" . (string)$pos);
+                $newparam->Value = new PhpParser\Node\Expr\Variable($paramname);
                 $newparam->Sources[] = 'arg' . (string)$pos;
                 $Slice->Variables[$paramname] = $pos;
                 $Slice->VariableValues[] = $newparam;
@@ -51,6 +37,7 @@ function MainAnalysisStart($AppPath) {
             }
             $Analyzer->ExecutionPerNode($Method->Body[0], $Method->Body[1], $Slice);
             GlobalVariable::$Analyzers[$ClassName][$MethodName] = $Analyzer;
+            $Analyzer->DumpConstraints($ClassName, $MethodName, array_keys($Method->Params));
         }
     }
 }

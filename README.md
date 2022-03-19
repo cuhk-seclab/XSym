@@ -29,7 +29,7 @@ php Main.php app.php
 php Main.php app/
 ```
 
-Note that XSym currently cannot support some complex PHP features like nested array access, etc.
+This stage outputs constrainnts written as PHP code. Note that XSym currently cannot support some complex PHP features like nested array access, etc.
 
 ### C-Compliant Program Synthesis
 
@@ -38,7 +38,7 @@ XSym synthesizes C-compliant programs for PHP constraint solving tasks. It adds 
 ```sh
 cd src/php-se
 # convert the task in task.php to a C program in main.c
-php Synth.php [task.php] [main.c]
+php Synth.php [XSS.txt] [XSSData.txt]
 ```
 
 ### C Symbolic Execution
